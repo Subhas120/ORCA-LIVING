@@ -1,0 +1,357 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  background: #07131f;
+  color: #e8f0f5;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.app {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 80% 10%, #12344a 0, transparent 35%),
+    #07131f;
+}
+
+.header {
+  height: 78px;
+  padding: 0 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #1c3545;
+  background: #081722;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 24px;
+  letter-spacing: 2px;
+}
+
+.header p {
+  margin: 5px 0 0;
+  color: #8299a8;
+  font-size: 13px;
+}
+
+.data-mode {
+  padding: 8px 14px;
+  border: 1px solid #7b632b;
+  border-radius: 20px;
+  color: #e4bd57;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+
+.dashboard {
+  max-width: 1500px;
+  margin: auto;
+  padding: 24px 32px 40px;
+}
+
+.objective {
+  padding: 18px 22px;
+  margin-bottom: 20px;
+  border: 1px solid #1c3545;
+  border-radius: 12px;
+  background: #0b1d2a;
+}
+
+.objective span,
+.panel-title,
+.section-heading span {
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  color: #7191a4;
+}
+
+.objective h2 {
+  margin: 8px 0 5px;
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.objective p {
+  margin: 0;
+  color: #718897;
+  font-size: 13px;
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: 1.7fr 1fr;
+  gap: 20px;
+}
+
+.map-panel,
+.decision-panel,
+.candidates {
+  border: 1px solid #1c3545;
+  border-radius: 14px;
+  background: #0b1d2a;
+  overflow: hidden;
+}
+
+.panel-title {
+  height: 48px;
+  padding: 0 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #1c3545;
+}
+
+.map-placeholder {
+  height: 500px;
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(30deg, transparent 49%, #17384a 50%, transparent 51%),
+    linear-gradient(150deg, transparent 49%, #17384a 50%, transparent 51%),
+    #092536;
+  background-size: 70px 70px;
+}
+
+.map-grid {
+  position: absolute;
+  inset: 0;
+}
+
+.map-label {
+  position: absolute;
+  bottom: 18px;
+  left: 18px;
+  padding: 8px 12px;
+  background: #07131fdd;
+  border: 1px solid #27485a;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #8ba6b6;
+}
+
+.candidate-marker {
+  position: absolute;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-weight: bold;
+  border: 3px solid;
+}
+
+.candidate-marker.recommended {
+  left: 35%;
+  top: 35%;
+  border-color: #55d69b;
+  color: #55d69b;
+  background: #0c3b2b;
+  box-shadow: 0 0 25px #55d69b55;
+}
+
+.candidate-marker.rejected {
+  left: 67%;
+  top: 22%;
+  border-color: #e56b6f;
+  color: #e56b6f;
+  background: #451c24;
+}
+
+.candidate-marker.alternative {
+  left: 55%;
+  top: 68%;
+  border-color: #e4bd57;
+  color: #e4bd57;
+  background: #493c1b;
+}
+
+.decision-panel {
+  padding-bottom: 20px;
+}
+
+.recommendation {
+  padding: 24px;
+  border-bottom: 1px solid #1c3545;
+}
+
+.recommendation > span {
+  color: #55d69b;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+}
+
+.recommendation h2 {
+  margin: 8px 0;
+  font-size: 32px;
+}
+
+.recommendation p {
+  margin: 0;
+  line-height: 1.6;
+  color: #8da5b4;
+  font-size: 14px;
+}
+
+.confidence {
+  color: #55d69b !important;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 1px solid #1c3545;
+}
+
+.metrics div {
+  padding: 18px 20px;
+  border-right: 1px solid #1c3545;
+  border-bottom: 1px solid #1c3545;
+}
+
+.metrics span,
+.candidate-stats small {
+  display: block;
+  color: #708896;
+  font-size: 10px;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+
+.metrics strong {
+  font-size: 20px;
+}
+
+.why {
+  padding: 20px 24px;
+}
+
+.why h3 {
+  margin: 0 0 14px;
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  color: #7191a4;
+}
+
+.why p {
+  margin: 9px 0;
+  font-size: 13px;
+  color: #b5c7d0;
+}
+
+.candidates {
+  margin-top: 20px;
+  padding-bottom: 20px;
+}
+
+.section-heading {
+  padding: 18px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #1c3545;
+}
+
+.section-heading h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.candidate-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  padding: 18px;
+}
+
+.candidate-card {
+  padding: 18px;
+  border: 1px solid #294253;
+  border-radius: 10px;
+  background: #0d2331;
+}
+
+.candidate-card.recommended {
+  border-color: #397d63;
+}
+
+.candidate-card.rejected {
+  border-color: #743c43;
+  opacity: 0.8;
+}
+
+.candidate-card.alternative {
+  border-color: #79652f;
+}
+
+.candidate-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.candidate-header h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.candidate-header span {
+  font-size: 9px;
+  letter-spacing: 1px;
+  padding: 5px 7px;
+  border-radius: 4px;
+  background: #142e3d;
+}
+
+.candidate-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.candidate-stats strong {
+  font-size: 15px;
+}
+
+.candidate-reason {
+  margin: 18px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid #1c3545;
+  color: #839ba9;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 1000px) {
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .candidate-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .dashboard {
+    padding: 15px;
+  }
+
+  .header {
+    padding: 0 15px;
+  }
+
+  .map-placeholder {
+    height: 380px;
+  }
+}
