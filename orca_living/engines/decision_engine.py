@@ -1,15 +1,15 @@
-﻿"""Decision engine for ORCA-LIVING.
+"""Decision engine for ORCA-LIVING.
 
 The DecisionEngine coordinates the deterministic M1 decision pipeline:
 
 CandidateAction[]
-        ↓
+        ?
 Safety Firewall
-        ↓
+        ?
 Dominance Filter
-        ↓
+        ?
 Multi-Objective Optimizer
-        ↓
+        ?
 Decision
 
 Scientific safety is supplied by M2 through SafetyEvaluation.
@@ -127,14 +127,18 @@ class DecisionEngine:
                 ),
                 rejection_reasons=rejection_reasons,
                 evidence_refs=tuple(
-                    ref
-                    for evaluation in evaluations
-                    for ref in evaluation.evidence_refs
+                    dict.fromkeys(
+                        ref
+                        for evaluation in evaluations
+                        for ref in evaluation.evidence_refs
+                    )
                 ),
                 uncertainty_refs=tuple(
-                    ref
-                    for evaluation in evaluations
-                    for ref in evaluation.uncertainty_refs
+                    dict.fromkeys(
+                        ref
+                        for evaluation in evaluations
+                        for ref in evaluation.uncertainty_refs
+                    )
                 ),
                 reason=(
                     "No safe actionable candidate is available."
