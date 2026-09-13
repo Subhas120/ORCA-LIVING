@@ -98,6 +98,10 @@ class Decision:
         default_factory=tuple
     )
 
+    optimization_objectives: tuple[str, ...] = field(
+        default_factory=tuple
+    )
+
     sensitivity_summary: Optional[str] = None
 
     confidence: Optional[float] = None

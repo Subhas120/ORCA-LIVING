@@ -210,6 +210,7 @@ class DecisionEngine:
             ),
             evidence_refs=evidence_refs,
             uncertainty_refs=uncertainty_refs,
+            optimization_objectives=optimization_result.comparison_order,
             reason=(
                 f"{preferred.id} was preferred using the explicit "
                 f"objective priority order: "
