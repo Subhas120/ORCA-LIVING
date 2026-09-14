@@ -44,7 +44,7 @@ def test_decision_endpoint_valid_fixture(monkeypatch):
         )
 
         from orca_living.engines.candidate_generator import CandidateProposal
-        proposals = (CandidateProposal(id="mock-1", action_type="fishing", latitude=9.9, longitude=76.2, expected_opportunity=0.8, distance=5.0, objective_values={"Find safe opportunity": 0.8}),)
+        proposals = (CandidateProposal(id="mock-1", action_type="fishing", latitude=9.9, longitude=76.2, expected_opportunity=0.8, distance=5.0, objective_values={"opportunity": 0.8}),)
         safety_evals = (SafetyEvaluation(
             candidate_id="mock-1",
             status="SAFE",

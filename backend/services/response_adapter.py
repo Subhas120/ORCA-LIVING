@@ -8,11 +8,11 @@ class ResponseAdapter:
     def adapt(decision_intel: DecisionIntelligence, status: StatusEnum) -> DecisionResponse:
         
         recommended_candidate = None
-        if decision_intel.decision.recommended_candidate_id:
+        if decision_intel.recommended_candidate_id:
             # Need to get details from pipeline output.
             pass
             
         return DecisionResponse(
             status=status,
-            decisionSummary=decision_intel.explanation.summary if decision_intel.explanation else None
+            decisionSummary=decision_intel.summary
         )

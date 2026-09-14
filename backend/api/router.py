@@ -38,7 +38,7 @@ async def get_decision(request: DecisionRequest):
             raise HTTPException(status_code=500, detail=f"M1 pipeline failed: {str(e)}")
 
         # 3. Response Adapter
-        if not decision_intel.decision.recommended_candidate_id:
+        if not decision_intel.recommended_candidate_id:
             status = StatusEnum.NO_SAFE_CANDIDATES
         else:
             status = StatusEnum.DECISION_AVAILABLE

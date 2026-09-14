@@ -9,15 +9,15 @@ class M1Service:
         self.pipeline = DecisionIntelligencePipeline()
 
     def run_decision_pipeline(self, world_state, proposals, safety_evaluations, request):
+        from datetime import datetime, timedelta
         objective = UserObjective(
-            id=str(uuid.uuid4()),
             original_query=request.query,
             operation=request.activity,
-            primary_objective="Find safe opportunity",
+            primary_objective="opportunity",
             secondary_objectives=tuple(),
-            time_window=TimeWindow(description=f"{request.date} {request.time}", start_time=None, end_time=None),
-            region=GeographicRegion(description=request.location, center_lat=0.0, center_lng=0.0, radius_km=0.0),
-            vessel=VesselContext(vessel_type=request.vessel_type or "Unknown", capabilities=tuple(), constraints=tuple()),
+            time_window=TimeWindow(start=datetime.now(), end=datetime.now() + timedelta(hours=24)),
+            region=GeographicRegion(name=request.location),
+            vessel=VesselContext(category=request.vessel_type or "Unknown"),
             constraints=tuple(),
             preferences=tuple()
         )
