@@ -6,7 +6,7 @@ M4 validates presence/format but does not infer missing marine facts.
 
 from typing import Optional
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, validator
 
 
 class DecisionRequest(BaseModel):
@@ -18,22 +18,13 @@ class DecisionRequest(BaseModel):
     vessel_type: Optional[str] = None
     scenario_id: Optional[str] = None
 
-    @field_validator(
-        "query",
-        "location",
-        "date",
-        "time",
-        "activity",
-        mode="before",
-    )
-    @classmethod
+    @validator("query", "location", "date", "time", "activity", pre=True)
     def require_non_empty_text(cls, value: str) -> str:
         if not isinstance(value, str) or not value.strip():
             raise ValueError("decision-critical fields cannot be empty")
         return value.strip()
 
-    @field_validator("vessel_type", "scenario_id", mode="before")
-    @classmethod
+    @validator("vessel_type", "scenario_id", pre=True)
     def normalize_optional_text(cls, value: Optional[str]) -> Optional[str]:
         if value is None:
             return None
