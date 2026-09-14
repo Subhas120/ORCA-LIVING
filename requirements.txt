@@ -3,3 +3,9 @@ uvicorn
 pydantic
 pytest
 httpx
+python-multipart
+SpeechRecognition
+langdetect
+deep-translator
+gTTS
+pyttsx3

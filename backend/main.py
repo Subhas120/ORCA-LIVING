@@ -2,6 +2,7 @@
 
 from fastapi import FastAPI
 from backend.api.router import router
+from backend.api.voice_router import router as voice_router
 
 app = FastAPI(title="ORCA-LIVING M4 Integration API")
 
@@ -10,6 +11,7 @@ async def health_check():
     return {"status": "healthy"}
 
 app.include_router(router, prefix="/api/v1")
+app.include_router(voice_router, prefix="/api/v1")
 
 if __name__ == "__main__":
     import uvicorn
