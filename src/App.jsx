@@ -10,6 +10,7 @@ import EvidencePanel from "./components/evidence/EvidencePanel";
 import WhatIfPanel from "./components/whatif/WhatIfPanel";
 import UncertaintyPanel from "./components/decision/UncertaintyPanel";
 import MarineConditions from "./components/decision/MarineConditions";
+import TemporalDecisionPanel from "./components/decision/TemporalDecisionPanel";
 
 
 function App() {
@@ -653,6 +654,13 @@ function App() {
               : currentDecision.uncertainty
           }
 
+        />
+
+
+        <TemporalDecisionPanel
+          currentDecision={
+            currentDecision
+          }
         />
 
 
