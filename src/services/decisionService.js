@@ -1,44 +1,27 @@
 /*
  * ORCA M3 DECISION SERVICE
  *
- * This is the integration layer between the
- * frontend and the M2 Ocean Agent response.
+ * M3 communicates with the authoritative M4 integration API.
  *
- * api.js
- *   ↓
- * raw backend response
- *
- * m2Adapter.js
- *   ↓
- * normalized M3 decision state
- *
- * React components
- *   ↓
- * visualization
+ * M4
+ *  ↓
+ * /api/v1/decision
+ *  ↓
+ * M4 response
+ *  ↓
+ * m4Adapter
+ *  ↓
+ * M3 visualization
  */
 
-import {
-  requestOceanData,
-} from "./api.js";
+import { requestDecision } from "./api.js";
 
 import {
-  adaptM2Response,
-} from "./m2Adapter.js";
+  adaptM4Response,
+} from "./m4Adapter.js";
 
+export async function getDecision(request) {
+  const m4Response = await requestDecision(request);
 
-/*
- * Get an ORCA decision from the backend.
- *
- * The request follows the shared AgentRequest
- * structure provided by M1/M2.
- */
-export async function getDecision(
-  request
-) {
-  const m2Response =
-    await requestOceanData(request);
-
-  return adaptM2Response(
-    m2Response
-  );
+  return adaptM4Response(m4Response);
 }

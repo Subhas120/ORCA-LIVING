@@ -1,46 +1,17 @@
 /*
- * ORCA M3 API SERVICE
+ * ORCA M4 API SERVICE
  *
- * The frontend communicates with the ORCA backend
- * through this service only.
- *
- * The actual backend endpoint is supplied through:
- *
- * VITE_ORCA_OCEAN_ENDPOINT
- *
- * We do not hard-code an endpoint because the
- * M1/M2/M3 REST contract is not finalized yet.
+ * The frontend communicates only with the authoritative
+ * M4 integration API.
  */
 
-const OCEAN_ENDPOINT =
-  import.meta.env.VITE_ORCA_OCEAN_ENDPOINT || null;
+const DECISION_ENDPOINT =
+  import.meta.env.VITE_ORCA_DECISION_ENDPOINT ||
+  "http://localhost:8000/api/v1/decision";
 
-
-/*
- * Send an AgentRequest to the backend.
- *
- * Expected request structure:
- *
- * {
- *   query,
- *   location,
- *   destination,
- *   date,
- *   time,
- *   activity
- * }
- */
-export async function requestOceanData(
-  request
-) {
-  if (!OCEAN_ENDPOINT) {
-    throw new Error(
-      "ORCA Ocean API endpoint is not configured."
-    );
-  }
-
+export async function requestDecision(request) {
   const response = await fetch(
-    OCEAN_ENDPOINT,
+    DECISION_ENDPOINT,
     {
       method: "POST",
 
@@ -54,7 +25,7 @@ export async function requestOceanData(
 
   if (!response.ok) {
     throw new Error(
-      `ORCA backend request failed: ${response.status} ${response.statusText}`
+      `ORCA M4 request failed: ${response.status} ${response.statusText}`
     );
   }
 

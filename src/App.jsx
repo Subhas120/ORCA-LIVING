@@ -19,36 +19,22 @@ function App() {
 
 
   useEffect(() => {
-    const endpoint =
-      import.meta.env.VITE_ORCA_OCEAN_ENDPOINT;
-
-    if (!endpoint) {
-      return;
-    }
-
     async function loadDecision() {
       try {
         setLoading(true);
         setError(null);
 
         const result = await getDecision({
-          query:
-            demoDecisionState.objective.text,
-
-          location: null,
-
-          destination: null,
-
-          date: null,
-
-          time:
-            demoDecisionState.objective.time,
-
+          query: demoDecisionState.objective.text,
+          location: "Kochi",
+          date: "tomorrow",
+          time: "morning",
           activity: "fishing",
+          vessel_type: "small_vessel",
+          scenario_id: "PFZ_KOCHI_DEMO",
         });
 
         setDecision(result);
-
       } catch (err) {
         console.error(err);
 
@@ -56,35 +42,33 @@ function App() {
           err.message ||
           "Unable to load ORCA decision."
         );
-
       } finally {
         setLoading(false);
       }
     }
 
     loadDecision();
-
   }, []);
 
 
-  const usingM2 =
+  const usingM4 =
     decision !== null;
 
 
   const currentDecision =
-    usingM2
+    usingM4
       ? decision
       : demoDecisionState;
 
 
   const currentCandidates =
-    usingM2
+    usingM4
       ? decision.candidates
       : demoCandidates;
 
 
   const recommended =
-    usingM2
+    usingM4
       ? decision.recommendedCandidate
       : demoDecisionState.recommendedCandidate;
 
@@ -111,8 +95,8 @@ function App() {
 
           ◉{" "}
 
-          {usingM2
-            ? "M2 BACKEND"
+          {usingM4
+            ? "M4 BACKEND"
             : "SIMULATED DEMO"}
 
         </div>
@@ -157,7 +141,7 @@ function App() {
         )}
 
 
-        {!usingM2 &&
+        {!usingM4 &&
           !loading && (
 
             <section className="integration-status demo">
@@ -168,7 +152,7 @@ function App() {
 
               <span>
                 {" "}
-                M2 HTTP endpoint is not configured.
+                M4 backend is not available.
                 {" "}
                 The dashboard is displaying clearly
                 labelled simulated demonstration data.
@@ -237,13 +221,15 @@ function App() {
 
               <span className="confidence">
 
-                {usingM2
+                {usingM4
                   ? (
                     currentDecision.confidence !== null
                       ? `${currentDecision.confidence}%`
                       : "UNKNOWN"
                   )
-                  : recommended.confidence}
+                  : recommended?.confidence != null
+                    ? `${recommended.confidence}%`
+                    : "UNKNOWN"}
 
               </span>
 
@@ -263,10 +249,11 @@ function App() {
 
               <p>
 
-                {usingM2
+                {usingM4
                   ? (
                     currentDecision.recommendation
                       ?.reason ??
+                    currentDecision.decisionSummary ??
                     "Recommendation reason unavailable."
                   )
                   : demoDecisionState.decisionSummary}
@@ -276,7 +263,7 @@ function App() {
             </div>
 
 
-            {usingM2 && (
+            {usingM4 && (
 
               <div className="marine-safety">
 
@@ -285,11 +272,12 @@ function App() {
                 </span>
 
                 <strong>
-                  {currentDecision.marineSafety.status}
+                  {currentDecision.marineSafety?.status ??
+                    "UNKNOWN"}
                 </strong>
 
                 {currentDecision.marineSafety
-                  .reasons?.map(
+                  ?.reasons?.map(
                     (reason) => (
 
                       <p key={reason}>
@@ -315,12 +303,14 @@ function App() {
 
                 <strong>
 
-                  {usingM2
+                  {usingM4
                     ? (
                       currentDecision.marineSafety
-                        .status ?? "—"
+                        ?.status ?? "—"
                     )
-                    : `${recommended.safety}%`}
+                    : recommended?.safety != null
+                      ? `${recommended.safety}%`
+                      : "—"}
 
                 </strong>
 
@@ -335,15 +325,15 @@ function App() {
 
                 <strong>
 
-                  {usingM2
+                  {usingM4
                     ? (
-                      recommended.opportunityStatus
-                        ?.replace(
-                          "_",
-                          " "
-                        ) ?? "—"
+                      recommended?.opportunity != null
+                        ? `${recommended.opportunity}%`
+                        : "—"
                     )
-                    : `${recommended.opportunity}%`}
+                    : recommended?.opportunity != null
+                      ? `${recommended.opportunity}%`
+                      : "—"}
 
                 </strong>
 
@@ -358,12 +348,14 @@ function App() {
 
                 <strong>
 
-                  {usingM2
+                  {usingM4
                     ? (
                       currentDecision.uncertainty
-                        .level ?? "—"
+                        ?.level ?? "—"
                     )
-                    : `${recommended.uncertainty}%`}
+                    : recommended?.uncertainty != null
+                      ? `${recommended.uncertainty}%`
+                      : "—"}
 
                 </strong>
 
@@ -397,7 +389,7 @@ function App() {
               </h3>
 
 
-              {usingM2 ? (
+              {usingM4 ? (
 
                 currentDecision.recommendation
                   ?.reason ? (
@@ -405,6 +397,13 @@ function App() {
                   <p>
                     ✓{" "}
                     {currentDecision.recommendation.reason}
+                  </p>
+
+                ) : currentDecision.decisionSummary ? (
+
+                  <p>
+                    ✓{" "}
+                    {currentDecision.decisionSummary}
                   </p>
 
                 ) : (
@@ -439,13 +438,13 @@ function App() {
 
         <MarineConditions
           conditions={
-            usingM2
+            usingM4
               ? currentDecision.marineConditions
               : demoDecisionState.marineConditions
           }
 
           safety={
-            usingM2
+            usingM4
               ? currentDecision.marineSafety
               : null
           }
@@ -517,12 +516,10 @@ function App() {
 
                       <strong>
 
-                        {usingM2
-                          ? (
-                            candidate.opportunityStatus ??
-                            "—"
-                          )
-                          : `${candidate.opportunity}%`}
+                        {candidate.opportunity != null
+                          ? `${candidate.opportunity}%`
+                          : candidate.opportunityStatus ??
+                            "—"}
 
                       </strong>
 
@@ -596,14 +593,14 @@ function App() {
           candidate={recommended}
 
           evidence={
-            usingM2
+            usingM4
               ? currentDecision.evidence
               : demoDecisionState.evidence
           }
 
           dataMode={
-            usingM2
-              ? "M2 BACKEND"
+            usingM4
+              ? currentDecision.dataMode
               : demoDecisionState.dataMode
           }
         />
@@ -611,7 +608,7 @@ function App() {
 
         <UncertaintyPanel
           uncertainty={
-            usingM2
+            usingM4
               ? currentDecision.uncertainty
               : demoDecisionState.uncertainty
           }
