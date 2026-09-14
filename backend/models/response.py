@@ -57,4 +57,4 @@ class DecisionResponse(BaseModel):
     uncertainty: Optional[Uncertainty] = None
     evidence: Optional[List[EvidenceItem]] = []
     sensitivity: Optional[Sensitivity] = None
-    dataMode: str = "LIVE"
+    dataMode: str = "DEMO"

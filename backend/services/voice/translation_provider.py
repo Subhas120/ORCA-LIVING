@@ -1,218 +1,359 @@
-"""M4 Translation module.
-
-Translates text between languages using deep-translator.
-Preserves numerical values, coordinates, and units.
-
-SAFETY: Translation is a pure linguistic operation.
-It MUST NOT interpret marine safety data, alter recommendations,
-paraphrase safety warnings to sound "nicer", or remove warnings.
-Numbers, coordinates, and units MUST be preserved exactly.
-"""
+# backend/services/voice/translation_provider.py
 
 from __future__ import annotations
 
-import os
-import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+import os
+import re
 from typing import Optional
+
+
+class TranslationError(Exception):
+    """Base translation error."""
+
+
+class TranslationProviderUnavailableError(TranslationError):
+    """Raised when the translation service is unavailable."""
 
 
 @dataclass(frozen=True)
 class TranslationResult:
-    """Result of text translation."""
-    translated_text: str
+    text: str
     source_language: str
     target_language: str
-    provider: str = "unknown"
+    provider: str
 
-
-class TranslationError(Exception):
-    """Raised when translation fails."""
-    pass
-
-
-class TranslationProviderUnavailableError(TranslationError):
-    """Raised when the translation provider is unreachable."""
-    pass
+    @property
+    def translated_text(self) -> str:
+        return self.text
 
 
 class TranslationProvider(ABC):
-    """Abstract interface for text translation."""
+    """Interface for translation providers used by M4."""
 
     @abstractmethod
-    def translate(self, text: str, source_lang: str, target_lang: str) -> TranslationResult:
-        """Translate text from source to target language.
+    def translate(
+        self,
+        text: str,
+        source_lang: Optional[str] = None,
+        target_lang: Optional[str] = None,
+        source_language: Optional[str] = None,
+        target_language: Optional[str] = None,
+    ) -> TranslationResult:
+        raise NotImplementedError
 
-        Args:
-            text: Text to translate.
-            source_lang: ISO 639-1 source language code.
-            target_lang: ISO 639-1 target language code.
 
-        Returns:
-            TranslationResult with translated text.
+def _normalize_language(
+    value: Optional[str],
+    default: str,
+) -> str:
+    if not value:
+        return default
 
-        Raises:
-            TranslationError: On translation failure.
-            TranslationProviderUnavailableError: When provider is unreachable.
-        """
+    value = value.strip().lower()
 
-    # Languages verified to work with deep-translator's Google engine.
-    VERIFIED_LANGUAGES = {"en", "hi", "ta", "te", "ml", "kn", "bn", "mr", "gu"}
+    aliases = {
+        "english": "en",
+        "en-us": "en",
+        "en-gb": "en",
+        "hindi": "hi",
+        "tamil": "ta",
+        "telugu": "te",
+        "malayalam": "ml",
+        "kannada": "kn",
+        "bengali": "bn",
+        "marathi": "mr",
+        "gujarati": "gu",
+    }
+
+    return aliases.get(value, value)
+
+
+def _protect_identifiers(
+    text: str,
+) -> tuple[str, dict[str, str]]:
+    """
+    Protect numbers, coordinates, and distances from translation.
+    """
+
+    protected: dict[str, str] = {}
+
+    pattern = re.compile(
+        r"""
+        \b\d+(?:\.\d+)?\s*°?\s*[NSEW]\b
+        |
+        \b\d+(?:\.\d+)?\s*(?:km|m|nm)\b
+        |
+        \b\d+(?:\.\d+)?\b
+        """,
+        re.IGNORECASE | re.VERBOSE,
+    )
+
+    counter = 0
+
+    def replace(match: re.Match[str]) -> str:
+        nonlocal counter
+
+        token = f"ORCA_NUM_{counter}_TOKEN"
+        protected[token] = match.group(0)
+        counter += 1
+
+        return token
+
+    return pattern.sub(replace, text), protected
+
+
+def _restore_identifiers(
+    text: str,
+    protected: dict[str, str],
+) -> str:
+    for token, original in protected.items():
+        text = text.replace(token, original)
+
+    return text
 
 
 class GoogleTranslationProvider(TranslationProvider):
-    """Translation using deep-translator's Google Translate engine.
+    """
+    Real translation provider.
 
-    This is a free translation service. No API key required.
-    Requires internet connectivity.
+    GoogleTranslator is attempted first.
+    MyMemoryTranslator is used as fallback.
     """
 
-    def __init__(self):
+    def translate(
+        self,
+        text: str,
+        source_lang: Optional[str] = None,
+        target_lang: Optional[str] = None,
+        source_language: Optional[str] = None,
+        target_language: Optional[str] = None,
+    ) -> TranslationResult:
+
+        source = _normalize_language(
+            source_lang or source_language,
+            "auto",
+        )
+
+        target = _normalize_language(
+            target_lang or target_language,
+            "en",
+        )
+
+        clean_text = text.strip() if text else ""
+
+        if not clean_text:
+            return TranslationResult(
+                text="",
+                source_language=source,
+                target_language=target,
+                provider="google",
+            )
+
+        # Translation is unnecessary when both languages are identical.
+        if source != "auto" and source == target:
+            return TranslationResult(
+                text=clean_text,
+                source_language=source,
+                target_language=target,
+                provider="passthrough",
+            )
+
+        protected_text, protected = _protect_identifiers(
+            clean_text
+        )
+
+        google_error: Optional[Exception] = None
+
         try:
-            from deep_translator import GoogleTranslator as _GT
-            self._translator_class = _GT
-        except ImportError:
-            raise TranslationProviderUnavailableError(
-                "deep-translator library not installed. "
-                "Run: pip install deep-translator"
-            )
+            from deep_translator import GoogleTranslator
 
-    def translate(self, text: str, source_lang: str, target_lang: str) -> TranslationResult:
-        """Translate text using Google Translate."""
-        if not text or not text.strip():
-            return TranslationResult(
-                translated_text=text,
-                source_language=source_lang,
-                target_language=target_lang,
-                provider="google_translate"
-            )
+            translated = GoogleTranslator(
+                source=source,
+                target=target,
+            ).translate(protected_text)
 
-        # No translation needed for same language
-        if source_lang == target_lang:
-            return TranslationResult(
-                translated_text=text,
-                source_language=source_lang,
-                target_language=target_lang,
-                provider="google_translate"
-            )
-
-        try:
-            # Protect numerical values, coordinates, and units from translation
-            protected_text, placeholders = self._protect_values(text)
-
-            translator = self._translator_class(source=source_lang, target=target_lang)
-            translated = translator.translate(protected_text)
-
-            # Restore protected values
-            restored_text = self._restore_values(translated, placeholders)
-
-            return TranslationResult(
-                translated_text=restored_text,
-                source_language=source_lang,
-                target_language=target_lang,
-                provider="google_translate"
-            )
-        except Exception as e:
-            if "connection" in str(e).lower() or "timeout" in str(e).lower():
-                raise TranslationProviderUnavailableError(
-                    f"Google Translate service unavailable: {e}"
+            if translated:
+                return TranslationResult(
+                    text=_restore_identifiers(
+                        translated,
+                        protected,
+                    ),
+                    source_language=source,
+                    target_language=target,
+                    provider="google",
                 )
-            raise TranslationError(f"Translation failed: {e}")
 
-    @staticmethod
-    def _protect_values(text: str) -> tuple[str, dict[str, str]]:
-        """Replace numbers, coordinates, and units with placeholders.
+        except Exception as exc:
+            google_error = exc
 
-        This prevents the translator from altering numerical data.
-        """
-        placeholders = {}
-        counter = [0]
+        try:
+            from deep_translator import MyMemoryTranslator
 
-        def replace_match(match):
-            key = f"__ORCA_NUM_{counter[0]}__"
-            placeholders[key] = match.group(0)
-            counter[0] += 1
-            return key
+            translated = MyMemoryTranslator(
+                source="auto" if source == "auto" else source,
+                target=target,
+            ).translate(protected_text)
 
-        # Match: coordinates (9.9°N, 76.2°E), decimals, times, dates, units
-        patterns = [
-            r'\d+\.?\d*\s*°[NSEW]',        # Coordinates with direction
-            r'\d+\.?\d*\s*(?:km|m|ft|nm|knots?|kt|mph|km/h|°C|°F|hPa|mb|mm)',  # Values with units
-            r'\d{1,2}:\d{2}(?::\d{2})?',    # Times
-            r'\d{4}-\d{2}-\d{2}',           # ISO dates
-            r'-?\d+\.?\d*',                 # Plain numbers (last to avoid over-matching)
-        ]
+            if translated:
+                return TranslationResult(
+                    text=_restore_identifiers(
+                        translated,
+                        protected,
+                    ),
+                    source_language=source,
+                    target_language=target,
+                    provider="mymemory",
+                )
 
-        protected = text
-        for pattern in patterns:
-            protected = re.sub(pattern, replace_match, protected)
-
-        return protected, placeholders
-
-    @staticmethod
-    def _restore_values(text: str, placeholders: dict[str, str]) -> str:
-        """Restore protected values in translated text."""
-        restored = text
-        for key, value in placeholders.items():
-            restored = restored.replace(key, value)
-        return restored
-
-
-class TestTranslationProvider(TranslationProvider):
-    """Deterministic translation provider for testing.
-
-    Supports a small set of hard-coded translations for testing
-    the voice pipeline without network access.
-    """
-
-    # Verified test translations (English <-> Hindi only for testing)
-    _TEST_TRANSLATIONS = {
-        ("hi", "en"): {
-            "कोच्चि के पास सुरक्षित मछली पकड़ने की जगह खोजें": "Find safe fishing spot near Kochi",
-            "कल सुबह मछली पकड़ना": "Fishing tomorrow morning",
-        },
-        ("en", "hi"): {
-            "Safe fishing recommended near Kochi": "कोच्चि के पास सुरक्षित मछली पकड़ने की सिफारिश",
-            "Unsafe conditions detected": "असुरक्षित स्थितियाँ पाई गईं",
-            "Insufficient evidence for safety assessment": "सुरक्षा मूल्यांकन के लिए अपर्याप्त साक्ष्य",
-        },
-    }
-
-    def translate(self, text: str, source_lang: str, target_lang: str) -> TranslationResult:
-        """Return deterministic test translation."""
-        if source_lang == target_lang:
-            return TranslationResult(
-                translated_text=text,
-                source_language=source_lang,
-                target_language=target_lang,
-                provider="test"
+        except Exception as fallback_error:
+            raise TranslationProviderUnavailableError(
+                "Both Google and MyMemory translation providers "
+                "are unavailable."
+            ) from (
+                fallback_error
+                if google_error is None
+                else google_error
             )
 
-        key = (source_lang, target_lang)
-        translations = self._TEST_TRANSLATIONS.get(key, {})
-        translated = translations.get(text, f"[{target_lang}] {text}")
-
-        return TranslationResult(
-            translated_text=translated,
-            source_language=source_lang,
-            target_language=target_lang,
-            provider="test"
+        raise TranslationProviderUnavailableError(
+            "Translation provider returned no translation."
         )
 
 
-def get_translation_provider() -> TranslationProvider:
-    """Factory: get the configured translation provider.
-
-    Controlled by ORCA_TRANSLATION_PROVIDER env var:
-      - "google" (default): Google Translate via deep-translator
-      - "test": Deterministic test provider
+class TestTranslationProvider(TranslationProvider):
     """
-    provider_name = os.environ.get("ORCA_TRANSLATION_PROVIDER", "google")
+    Deterministic provider used by the M4 automated test suite.
 
-    if provider_name == "test":
+    Contract:
+      - same language -> exact passthrough
+      - known fixture -> deterministic translation
+      - unknown text -> [target] text
+    """
+
+    TRANSLATIONS = {
+        (
+            "कल सुबह मछली पकड़ना",
+            "hi",
+            "en",
+        ): "Fishing tomorrow morning",
+
+        (
+            "कोच्चि के पास कल सुबह मछली पकड़ने के लिए एक अच्छी जगह खोजें",
+            "hi",
+            "en",
+        ): "Find a good place to fish tomorrow morning near Kochi",
+
+        (
+            "कोच्चि के पास मछली पकड़ने के लिए एक अच्छी जगह खोजें",
+            "hi",
+            "en",
+        ): "Find a good fishing spot near Kochi",
+
+        (
+            "find a good place to fish tomorrow morning near kochi",
+            "en",
+            "hi",
+        ): "कोच्चि के पास कल सुबह मछली पकड़ने के लिए एक अच्छी जगह खोजें",
+    }
+
+    def translate(
+        self,
+        text: str,
+        source_lang: Optional[str] = None,
+        target_lang: Optional[str] = None,
+        source_language: Optional[str] = None,
+        target_language: Optional[str] = None,
+    ) -> TranslationResult:
+
+        source = _normalize_language(
+            source_lang or source_language,
+            "en",
+        )
+
+        target = _normalize_language(
+            target_lang or target_language,
+            "en",
+        )
+
+        clean_text = text.strip() if text else ""
+
+        # TEST CONTRACT:
+        # "hello", "en", "en" -> "hello"
+        if source == target:
+            return TranslationResult(
+                text=clean_text,
+                source_language=source,
+                target_language=target,
+                provider="test",
+            )
+
+        key = (
+            clean_text,
+            source,
+            target,
+        )
+
+        translated = self.TRANSLATIONS.get(key)
+
+        if translated is None:
+            key = (
+                clean_text.lower(),
+                source,
+                target,
+            )
+
+            translated = self.TRANSLATIONS.get(key)
+
+        # TEST CONTRACT:
+        # unknown text must be prefixed with [target].
+        if translated is None:
+            translated = f"[{target}] {clean_text}"
+
+        return TranslationResult(
+            text=translated,
+            source_language=source,
+            target_language=target,
+            provider="test",
+        )
+
+
+def get_translation_provider(
+    provider: Optional[str] = None,
+) -> TranslationProvider:
+
+    selected = (
+        provider
+        or os.getenv("ORCA_TRANSLATION_PROVIDER")
+        or "google"
+    ).strip().lower()
+
+    if selected in {
+        "test",
+        "mock",
+        "offline",
+    }:
         return TestTranslationProvider()
-    elif provider_name == "google":
+
+    if selected in {
+        "google",
+        "mymemory",
+        "auto",
+    }:
         return GoogleTranslationProvider()
-    else:
-        raise TranslationError(f"Unknown translation provider: {provider_name}")
+
+    raise ValueError(
+        f"Unsupported translation provider: {selected}"
+    )
+
+
+__all__ = [
+    "TranslationError",
+    "TranslationProviderUnavailableError",
+    "TranslationResult",
+    "TranslationProvider",
+    "GoogleTranslationProvider",
+    "TestTranslationProvider",
+    "get_translation_provider",
+]

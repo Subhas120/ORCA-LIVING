@@ -1,30 +1,14 @@
-"""M4 Voice Intent Extractor.
-
-Extracts structured fields from normalized text to build
-a DecisionRequest for the M4 backend.
-
-SAFETY INVARIANT: This module performs ONLY linguistic parsing.
-It MUST NOT:
-  - perform marine safety reasoning
-  - invent marine thresholds or constraints
-  - fabricate geographic or temporal data
-  - guess decision-critical fields when ambiguous
-
-When a decision-critical field is ambiguous or missing,
-the extractor returns a ClarificationRequired result
-instead of guessing.
-"""
+# backend/services/voice/intent_extractor.py
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Optional
+import re
 
 
 @dataclass(frozen=True)
 class ClarificationRequired:
-    """Indicates the voice input needs clarification before proceeding."""
-
     missing_fields: tuple[str, ...]
     message: str
     original_text: str
@@ -32,29 +16,12 @@ class ClarificationRequired:
 
 @dataclass(frozen=True)
 class ExtractedIntent:
-    """Structured intent extracted from normalized voice text."""
-
     query: str
     location: Optional[str] = None
     date: Optional[str] = None
     time: Optional[str] = None
     activity: Optional[str] = None
     vessel_type: Optional[str] = None
-
-
-KNOWN_ACTIVITIES = {
-    "fishing",
-    "sailing",
-    "diving",
-    "snorkeling",
-    "surfing",
-    "shipping",
-    "navigation",
-    "transport",
-    "recreational",
-    "trawling",
-    "netting",
-}
 
 
 KNOWN_LOCATIONS = {
@@ -90,10 +57,20 @@ KNOWN_LOCATIONS = {
 }
 
 
+DATE_KEYWORDS = {
+    "next week": "next week",
+    "this week": "this week",
+    "tomorrow": "tomorrow",
+    "today": "today",
+    "aaj": "today",
+    "kal": "tomorrow",
+}
+
+
 TIME_KEYWORDS = {
     "morning": "morning",
-    "evening": "evening",
     "afternoon": "afternoon",
+    "evening": "evening",
     "night": "night",
     "dawn": "dawn",
     "dusk": "dusk",
@@ -106,38 +83,144 @@ TIME_KEYWORDS = {
 }
 
 
-DATE_KEYWORDS = {
-    "today": "today",
-    "tomorrow": "tomorrow",
-    "aaj": "today",
-    "kal": "tomorrow",
-    "next week": "next week",
-    "this week": "this week",
-}
-
-
 VESSEL_KEYWORDS = {
-    "small": "Small",
-    "large": "Large",
-    "medium": "Medium",
+    "small boat": "Small",
+    "large boat": "Large",
+    "medium boat": "Medium",
+    "motorboat": "Medium",
+    "catamaran": "Medium",
     "trawler": "Trawler",
+    "canoe": "Small",
+    "dinghy": "Small",
+    "yacht": "Medium",
     "boat": "Small",
     "ship": "Large",
-    "canoe": "Small",
-    "yacht": "Medium",
-    "dinghy": "Small",
-    "catamaran": "Medium",
-    "motorboat": "Medium",
+    "small": "Small",
+    "medium": "Medium",
+    "large": "Large",
 }
 
 
-def extract_intent(text: str) -> ExtractedIntent | ClarificationRequired:
-    """Extract structured intent from normalized voice text.
+def _contains_word(text: str, phrase: str) -> bool:
+    phrase = phrase.strip().lower()
 
-    Decision-critical fields are activity, location, date, and time.
-    If any required field is missing, clarification is requested
-    instead of fabricating a value.
-    """
+    if not phrase:
+        return False
+
+    pattern = rf"(?<!\w){re.escape(phrase)}(?!\w)"
+
+    return re.search(
+        pattern,
+        text.lower(),
+        flags=re.IGNORECASE,
+    ) is not None
+
+
+def _extract_activity(text: str) -> Optional[str]:
+    text_lower = text.lower()
+
+    fishing_phrases = (
+        "catching fish",
+        "catch fish",
+        "go fishing",
+        "to fish",
+        "fishing",
+        "angling",
+        "fishes",
+        "fished",
+        "fish",
+    )
+
+    for phrase in fishing_phrases:
+        if _contains_word(text_lower, phrase):
+            return "fishing"
+
+    other_activities = (
+        "snorkeling",
+        "sailing",
+        "diving",
+        "surfing",
+        "shipping",
+        "navigation",
+        "transport",
+        "recreational",
+        "trawling",
+        "netting",
+    )
+
+    for activity in other_activities:
+        if _contains_word(text_lower, activity):
+            return activity
+
+    return None
+
+
+def _extract_location(text: str) -> Optional[str]:
+    text_lower = text.lower()
+
+    aliases = {
+        "cochin": "Kochi",
+        "vizag": "Visakhapatnam",
+        "pondicherry": "Puducherry",
+        "calicut": "Kozhikode",
+        "trivandrum": "Thiruvananthapuram",
+    }
+
+    for location in sorted(
+        KNOWN_LOCATIONS,
+        key=lambda value: (-len(value), value),
+    ):
+        if _contains_word(text_lower, location):
+            return aliases.get(
+                location,
+                location.title(),
+            )
+
+    return None
+
+
+def _extract_date(text: str) -> Optional[str]:
+    text_lower = text.lower()
+
+    for keyword, normalized in sorted(
+        DATE_KEYWORDS.items(),
+        key=lambda item: (-len(item[0]), item[0]),
+    ):
+        if _contains_word(text_lower, keyword):
+            return normalized
+
+    return None
+
+
+def _extract_time(text: str) -> Optional[str]:
+    text_lower = text.lower()
+
+    for keyword, normalized in sorted(
+        TIME_KEYWORDS.items(),
+        key=lambda item: (-len(item[0]), item[0]),
+    ):
+        if _contains_word(text_lower, keyword):
+            return normalized
+
+    return None
+
+
+def _extract_vessel_type(text: str) -> Optional[str]:
+    text_lower = text.lower()
+
+    for keyword, normalized in sorted(
+        VESSEL_KEYWORDS.items(),
+        key=lambda item: (-len(item[0]), item[0]),
+    ):
+        if _contains_word(text_lower, keyword):
+            return normalized
+
+    return None
+
+
+def extract_intent(
+    text: str,
+) -> ExtractedIntent | ClarificationRequired:
 
     if not text or not text.strip():
         return ClarificationRequired(
@@ -146,67 +229,30 @@ def extract_intent(text: str) -> ExtractedIntent | ClarificationRequired:
             original_text="",
         )
 
-    text_lower = text.lower().strip()
+    original_text = text.strip()
 
-    # Extract activity
-    activity = None
+    activity = _extract_activity(original_text)
+    location = _extract_location(original_text)
+    date = _extract_date(original_text)
+    time_val = _extract_time(original_text)
+    vessel_type = _extract_vessel_type(original_text)
 
-    for keyword in KNOWN_ACTIVITIES:
-        if keyword in text_lower:
-            activity = keyword
-            break
+    missing: list[str] = []
 
-    # Extract location
-    location = None
-
-    for loc in KNOWN_LOCATIONS:
-        if loc in text_lower:
-            location = loc.title()
-            break
-
-    # Extract date
-    date = None
-
-    for keyword, normalized in DATE_KEYWORDS.items():
-        if keyword in text_lower:
-            date = normalized
-            break
-
-    # Extract time
-    time_val = None
-
-    for keyword, normalized in TIME_KEYWORDS.items():
-        if keyword in text_lower:
-            time_val = normalized
-            break
-
-    # Extract vessel type
-    vessel_type = None
-
-    for keyword, normalized in VESSEL_KEYWORDS.items():
-        if keyword in text_lower:
-            vessel_type = normalized
-            break
-
-    # Decision-critical field validation.
-    # Activity, location, date, and time are REQUIRED.
-    # Never guess or fabricate missing decision-critical fields.
-    missing = []
-
-    if not activity:
+    if activity is None:
         missing.append("activity")
 
-    if not location:
+    if location is None:
         missing.append("location")
 
-    if not date:
+    if date is None:
         missing.append("date")
 
-    if not time_val:
+    if time_val is None:
         missing.append("time")
 
     if missing:
-        suggestions = []
+        suggestions: list[str] = []
 
         if "activity" in missing:
             suggestions.append(
@@ -235,11 +281,11 @@ def extract_intent(text: str) -> ExtractedIntent | ClarificationRequired:
         return ClarificationRequired(
             missing_fields=tuple(missing),
             message=" ".join(suggestions),
-            original_text=text,
+            original_text=original_text,
         )
 
     return ExtractedIntent(
-        query=text,
+        query=original_text,
         location=location,
         date=date,
         time=time_val,
