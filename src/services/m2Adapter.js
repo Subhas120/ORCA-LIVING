@@ -1,27 +1,42 @@
 /*
  * M2 → M3 ADAPTER
  *
- * Converts the M2 AgentResponse into a frontend-friendly
- * structure without recreating M2 decision logic.
+ * Converts backend responses into a frontend-friendly
+ * structure without recreating marine safety, ranking,
+ * optimization, or decision logic.
  *
  * IMPORTANT:
- * We do not invent decision scores.
- *
- * The uncertainty score shown by M3 is derived from
- * the confidence value supplied by M2:
- *
- * M2 confidence 0.85
- * →
- * M3 uncertainty 15%
- *
- * This is a presentation-level conversion only.
+ * M3 only displays decision information supplied
+ * by the backend.
  */
 
+import {
+  adaptGISData,
+} from "./gisAdapter.js";
 
-function confidenceToPercent(confidence) {
+
+const DECISION_STATES = new Set([
+  "RECOMMENDED",
+  "ALTERNATIVE",
+  "UNSAFE",
+  "INSUFFICIENT_EVIDENCE",
+  "DOMINATED",
+  "REJECTED",
+]);
+
+
+function confidenceToPercent(
+  confidence
+) {
   if (
     confidence === null ||
     confidence === undefined
+  ) {
+    return null;
+  }
+
+  if (
+    typeof confidence !== "number"
   ) {
     return null;
   }
@@ -42,36 +57,99 @@ function confidenceToUncertaintyPercent(
     return null;
   }
 
+  if (
+    typeof confidence !== "number"
+  ) {
+    return null;
+  }
+
   return Math.round(
     (1 - confidence) * 100
   );
 }
 
 
+function getSemanticState(
+  candidate,
+  fallbackStatus
+) {
+  const suppliedState =
+    candidate?.decision_status ??
+    candidate?.semantic_status ??
+    candidate?.decisionState ??
+    candidate?.decision_state ??
+    null;
+
+  if (
+    typeof suppliedState === "string"
+  ) {
+    const normalized =
+      suppliedState
+        .trim()
+        .toUpperCase()
+        .replace(
+          /[\s-]+/g,
+          "_"
+        );
+
+    if (
+      DECISION_STATES.has(
+        normalized
+      )
+    ) {
+      return normalized;
+    }
+  }
+
+  return fallbackStatus;
+}
+
+
 function normalizeCandidate(
   candidate,
-  status
+  fallbackStatus
 ) {
   if (!candidate) {
     return null;
   }
 
   return {
-    id: candidate.pfz_id,
+    id:
+      candidate.pfz_id ??
+      candidate.id ??
+      null,
 
-    name: candidate.pfz_id,
+    name:
+      candidate.name ??
+      candidate.pfz_id ??
+      candidate.id ??
+      "Unnamed candidate",
 
-    status,
+    status:
+      getSemanticState(
+        candidate,
+        fallbackStatus
+      ),
 
-    lat: candidate.latitude,
+    lat:
+      candidate.latitude ??
+      candidate.lat ??
+      null,
 
-    lng: candidate.longitude,
+    lng:
+      candidate.longitude ??
+      candidate.lng ??
+      null,
 
     distance:
-      candidate.distance_km,
+      candidate.distance_km ??
+      candidate.distance ??
+      null,
 
     opportunityStatus:
-      candidate.status,
+      candidate.opportunity_status ??
+      candidate.status ??
+      null,
 
     opportunityScore:
       candidate.opportunity_score ??
@@ -85,6 +163,30 @@ function normalizeCandidate(
     source:
       candidate.source ??
       null,
+
+    reason:
+      candidate.reason ??
+      candidate.rejection_reason ??
+      null,
+
+    rejectionReason:
+      candidate.rejection_reason ??
+      candidate.rejectionReason ??
+      null,
+
+    rejectionReasons:
+      Array.isArray(
+        candidate.rejection_reasons
+      )
+        ? candidate.rejection_reasons
+        : [],
+
+    informationGaps:
+      Array.isArray(
+        candidate.information_gaps
+      )
+        ? candidate.information_gaps
+        : [],
   };
 }
 
@@ -96,41 +198,80 @@ function normalizeEvidence(
     return [];
   }
 
-  /*
-   * M2 currently returns evidence as an object
-   * keyed by parameter name.
-   *
-   * Convert it into an array for easier rendering.
-   */
-
-  if (Array.isArray(evidence)) {
+  if (
+    Array.isArray(evidence)
+  ) {
     return evidence;
+  }
+
+  if (
+    typeof evidence !== "object"
+  ) {
+    return [];
   }
 
   return Object.entries(
     evidence
   ).map(
     ([parameter, item]) => ({
-      id: parameter,
+      id:
+        parameter,
 
       parameter:
-        item.parameter ??
+        item?.parameter ??
         parameter,
 
       source:
-        item.source ??
+        item?.source ??
         null,
 
       timestamp:
-        item.timestamp ??
+        item?.timestamp ??
         null,
 
       confidence:
         confidenceToPercent(
-          item.confidence
+          item?.confidence
         ),
+
+      value:
+        item?.value ??
+        null,
+
+      observation:
+        item?.observation ??
+        null,
     })
   );
+}
+
+
+function normalizeArray(
+  value
+) {
+  return Array.isArray(value)
+    ? value
+    : [];
+}
+
+
+function normalizeAnalysis(
+  value
+) {
+  if (
+    value === null ||
+    value === undefined
+  ) {
+    return null;
+  }
+
+  if (
+    typeof value !== "object"
+  ) {
+    return null;
+  }
+
+  return value;
 }
 
 
@@ -139,7 +280,16 @@ export function adaptM2Response(
 ) {
   if (!response) {
     throw new Error(
-      "M2 response is missing"
+      "M2 response is missing."
+    );
+  }
+
+
+  if (
+    typeof response !== "object"
+  ) {
+    throw new Error(
+      "Backend response is malformed."
     );
   }
 
@@ -148,9 +298,27 @@ export function adaptM2Response(
     response.data ?? {};
 
 
+  if (
+    typeof data !== "object"
+  ) {
+    throw new Error(
+      "Backend response data is malformed."
+    );
+  }
+
+
   const recommendation =
     data.pfz_recommendation ??
     {};
+
+
+  if (
+    typeof recommendation !== "object"
+  ) {
+    throw new Error(
+      "PFZ recommendation data is malformed."
+    );
+  }
 
 
   const recommended =
@@ -161,9 +329,8 @@ export function adaptM2Response(
 
 
   const alternatives =
-    (
-      recommendation.alternatives ??
-      []
+    normalizeArray(
+      recommendation.alternatives
     ).map(
       (candidate) =>
         normalizeCandidate(
@@ -174,9 +341,8 @@ export function adaptM2Response(
 
 
   const rejected =
-    (
-      recommendation.rejected ??
-      []
+    normalizeArray(
+      recommendation.rejected
     ).map(
       (candidate) =>
         normalizeCandidate(
@@ -197,30 +363,38 @@ export function adaptM2Response(
   ];
 
 
-  const mapCoordinates =
-    (data.pfz ?? []).map(
-      (candidate) => ({
-        id: candidate.pfz_id,
-
-        lat:
-          candidate.latitude,
-
-        lng:
-          candidate.longitude,
-      })
+  const pfz =
+    normalizeArray(
+      data.pfz
     );
 
 
-  /*
-   * M2 provides an overall confidence value.
-   *
-   * Convert that confidence into an uncertainty
-   * percentage for visualization:
-   *
-   * confidence 0.85
-   * →
-   * uncertainty 15%
-   */
+  const mapCoordinates =
+    pfz
+      .map(
+        (candidate) => ({
+          id:
+            candidate.pfz_id ??
+            candidate.id ??
+            null,
+
+          lat:
+            candidate.latitude ??
+            candidate.lat ??
+            null,
+
+          lng:
+            candidate.longitude ??
+            candidate.lng ??
+            null,
+        })
+      )
+      .filter(
+        (candidate) =>
+          typeof candidate.lat === "number" &&
+          typeof candidate.lng === "number"
+      );
+
 
   const uncertaintyScore =
     confidenceToUncertaintyPercent(
@@ -228,35 +402,75 @@ export function adaptM2Response(
     );
 
 
-  /*
-   * M2's marine safety object contains the
-   * authoritative uncertainty level/reason.
-   */
-
   const marineSafety =
     data.marine_safety ?? {};
 
 
   const backendUncertainty =
-    marineSafety.uncertainty ?? {};
+    marineSafety.uncertainty ??
+    {};
+
+
+  const sensitivity =
+    normalizeAnalysis(
+      data.sensitivity ??
+      response.sensitivity
+    );
+
+
+  const counterfactual =
+    normalizeAnalysis(
+      data.counterfactual ??
+      data.counterfactual_results ??
+      response.counterfactual ??
+      response.counterfactual_results
+    );
+
+
+  const robustness =
+    normalizeAnalysis(
+      data.robustness ??
+      response.robustness
+    );
+
+
+  const informationGaps =
+    normalizeArray(
+      data.information_gaps ??
+      response.information_gaps
+    );
+
+
+  const gis =
+    adaptGISData(
+      data.gis ??
+      data.gis_data ??
+      response.gis ??
+      response.gis_data
+    );
 
 
   return {
 
     status:
-      response.status,
+      response.status ??
+      null,
 
     agent:
-      response.agent,
+      response.agent ??
+      null,
 
     location:
-      response.location,
+      response.location ??
+      null,
 
     source:
-      response.source,
+      response.source ??
+      null,
 
     timestamp:
-      response.timestamp,
+      response.timestamp ??
+      null,
 
     confidence:
       confidenceToPercent(
@@ -264,38 +478,33 @@ export function adaptM2Response(
       ),
 
     error:
-      response.error ?? null,
+      response.error ??
+      null,
 
-
-    /*
-     * M2 currently provides marine condition
-     * values, not frontend-generated values.
-     */
 
     marineConditions: {
 
       sst:
-        data.sst ?? null,
+        data.sst ??
+        null,
 
       chlorophyll:
-        data.chlorophyll ?? null,
+        data.chlorophyll ??
+        null,
 
       waveHeight:
-        data.wave_height ?? null,
+        data.wave_height ??
+        null,
 
       wavePeriod:
-        data.wave_period ?? null,
+        data.wave_period ??
+        null,
 
       currentSpeed:
-        data.current_speed ?? null,
+        data.current_speed ??
+        null,
     },
 
-
-    /*
-     * M2 is authoritative for marine safety.
-     *
-     * No safety score is fabricated here.
-     */
 
     marineSafety: {
 
@@ -304,23 +513,16 @@ export function adaptM2Response(
         null,
 
       hazards:
-        marineSafety.hazards ??
-        [],
+        normalizeArray(
+          marineSafety.hazards
+        ),
 
       reasons:
-        marineSafety.reasons ??
-        [],
+        normalizeArray(
+          marineSafety.reasons
+        ),
     },
 
-
-    /*
-     * Uncertainty visualization.
-     *
-     * Level and reason come from M2.
-     *
-     * Score is derived only from the M2
-     * top-level confidence value.
-     */
 
     uncertainty: {
 
@@ -337,20 +539,15 @@ export function adaptM2Response(
     },
 
 
-    pfz:
-      data.pfz ?? [],
-
+    pfz,
 
     candidates,
-
 
     recommendedCandidate:
       recommended,
 
-
     alternativeCandidates:
       alternatives,
-
 
     rejectedCandidates:
       rejected,
@@ -370,17 +567,45 @@ export function adaptM2Response(
       ),
 
 
+    sensitivity,
+
+    counterfactual,
+
+    robustness,
+
+    informationGaps,
+
+
+    gis,
+
+
     map: {
 
       coordinates:
         mapCoordinates,
 
       hazards:
-        marineSafety.hazards ??
-        [],
+        normalizeArray(
+          marineSafety.hazards
+        ),
 
       boundaryResults:
         [],
     },
+
+
+    decisionMetadata: {
+
+      authoritative:
+        false,
+
+      contract:
+        "M2 AgentResponse",
+
+      note:
+        "M2 response is displayed as supplied. M3 does not recreate decision intelligence.",
+
+    },
+
   };
 }

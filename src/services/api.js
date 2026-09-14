@@ -1,62 +1,176 @@
 /*
  * ORCA M3 API SERVICE
  *
- * The frontend communicates with the ORCA backend
- * through this service only.
+ * Frontend HTTP boundary for the M2 Ocean API.
  *
- * The actual backend endpoint is supplied through:
+ * M3 does not calculate marine safety, ranking,
+ * optimization, or scientific suitability here.
  *
- * VITE_ORCA_OCEAN_ENDPOINT
- *
- * We do not hard-code an endpoint because the
- * M1/M2/M3 REST contract is not finalized yet.
+ * This service only:
+ *   1. Sends an AgentRequest to the backend.
+ *   2. Enforces a frontend request timeout.
+ *   3. Validates the basic HTTP/JSON response shape.
+ *   4. Returns the backend response to the M2 adapter.
  */
 
-const OCEAN_ENDPOINT =
-  import.meta.env.VITE_ORCA_OCEAN_ENDPOINT || null;
+const DEFAULT_TIMEOUT_MS = 10000;
 
 
-/*
- * Send an AgentRequest to the backend.
- *
- * Expected request structure:
- *
- * {
- *   query,
- *   location,
- *   destination,
- *   date,
- *   time,
- *   activity
- * }
- */
+function getEndpoint() {
+  const endpoint =
+    import.meta.env.VITE_ORCA_OCEAN_ENDPOINT;
+
+  if (!endpoint) {
+    throw new Error(
+      "ORCA backend endpoint is not configured."
+    );
+  }
+
+  return endpoint;
+}
+
+
+function validateResponseShape(
+  response
+) {
+  if (
+    !response ||
+    typeof response !== "object"
+  ) {
+    throw new Error(
+      "Backend response is malformed."
+    );
+  }
+
+  if (
+    typeof response.status !== "string"
+  ) {
+    throw new Error(
+      "Backend response is missing a valid status."
+    );
+  }
+
+  if (
+    response.data !== undefined &&
+    (
+      response.data === null ||
+      typeof response.data !== "object"
+    )
+  ) {
+    throw new Error(
+      "Backend response data is malformed."
+    );
+  }
+
+  return response;
+}
+
+
 export async function requestOceanData(
   request
 ) {
-  if (!OCEAN_ENDPOINT) {
-    throw new Error(
-      "ORCA Ocean API endpoint is not configured."
-    );
-  }
+  const endpoint =
+    getEndpoint();
 
-  const response = await fetch(
-    OCEAN_ENDPOINT,
-    {
-      method: "POST",
+  const controller =
+    new AbortController();
 
-      headers: {
-        "Content-Type": "application/json",
+  const timeoutId =
+    setTimeout(
+      () => {
+        controller.abort();
       },
-
-      body: JSON.stringify(request),
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      `ORCA backend request failed: ${response.status} ${response.statusText}`
+      DEFAULT_TIMEOUT_MS
     );
-  }
 
-  return response.json();
+
+  try {
+    const response =
+      await fetch(
+        endpoint,
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+
+          body:
+            JSON.stringify(
+              request
+            ),
+
+          signal:
+            controller.signal,
+        }
+      );
+
+
+    let payload;
+
+    try {
+      payload =
+        await response.json();
+
+    } catch (error) {
+      throw new Error(
+        "Backend returned invalid JSON.",
+        {
+          cause: error,
+        }
+      );
+    }
+
+
+    if (!response.ok) {
+      const backendMessage =
+        payload?.error ??
+        payload?.message ??
+        `Backend request failed with HTTP ${response.status}.`;
+
+      throw new Error(
+        backendMessage
+      );
+    }
+
+
+    return validateResponseShape(
+      payload
+    );
+
+  } catch (error) {
+
+    if (
+      error?.name ===
+      "AbortError"
+    ) {
+      throw new Error(
+        "ORCA backend request timed out after 10 seconds.",
+        {
+          cause: error,
+        }
+      );
+    }
+
+    if (
+      error instanceof TypeError
+    ) {
+      throw new Error(
+        "Unable to reach the ORCA backend.",
+        {
+          cause: error,
+        }
+      );
+    }
+
+    throw error;
+
+  } finally {
+
+    clearTimeout(
+      timeoutId
+    );
+
+  }
 }
