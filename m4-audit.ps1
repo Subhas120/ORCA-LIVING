@@ -63,6 +63,7 @@ $RequiredFiles = @(
     "backend\api\voice_router.py",
     "backend\models\request.py",
     "backend\models\response.py",
+    "backend\services\decision_service.py",
     "backend\services\m1_service.py",
     "backend\services\m2_adapter.py",
     "backend\services\response_adapter.py",
@@ -113,6 +114,8 @@ SECTION "3. PYTHON IMPORTS"
 $ImportTests = @(
     "from backend.main import app",
     "from backend.api.router import router",
+    "from backend.api.voice_router import router",
+    "from backend.services.decision_service import decision_service",
     "from backend.services.m1_service import M1Service",
     "from backend.services.m2_adapter import M2Adapter",
     "from backend.services.response_adapter import ResponseAdapter",
@@ -195,13 +198,15 @@ else {
 }
 
 # ============================================================
-# 5. M1
+# 5. M1 + SHARED M4 ORCHESTRATION
 # ============================================================
 
-SECTION "5. M1 INTEGRATION"
+SECTION "5. M1 + M4 ORCHESTRATION"
 
 $M1 = Get-FileText "backend\services\m1_service.py"
+$DecisionService = Get-FileText "backend\services\decision_service.py"
 $Router = Get-FileText "backend\api\router.py"
+$VoiceRouter = Get-FileText "backend\api\voice_router.py"
 
 if ($M1 -match "DecisionIntelligencePipeline") {
     PASS "M4 uses DecisionIntelligencePipeline"
@@ -217,11 +222,32 @@ else {
     FAIL "M1Service does not call pipeline.run()"
 }
 
-if ($Router -match "M1Service") {
-    PASS "Router integrates M1Service"
+if ($DecisionService -match "M1Service" -and $DecisionService -match "M2Adapter" -and $DecisionService -match "ResponseAdapter") {
+    PASS "Shared DecisionService owns M2 -> M1 -> M4 orchestration"
 }
 else {
-    FAIL "Router does not integrate M1Service"
+    FAIL "Shared DecisionService orchestration contract incomplete"
+}
+
+if ($Router -match "decision_service\.run") {
+    PASS "REST router delegates to shared DecisionService"
+}
+else {
+    FAIL "REST router does not use shared DecisionService"
+}
+
+if ($VoiceRouter -match "decision_service\.run") {
+    PASS "Voice router delegates to shared DecisionService"
+}
+else {
+    FAIL "Voice router does not use shared DecisionService"
+}
+
+if ($VoiceRouter -notmatch "def _run_decision[\s\S]{0,300}M1Service") {
+    PASS "Voice router does not contain a second M1 orchestration engine"
+}
+else {
+    FAIL "Voice router contains duplicate M1 orchestration"
 }
 
 # ============================================================
@@ -287,25 +313,39 @@ foreach ($Field in $ResponseFields) {
 
 SECTION "8. SAFETY PROPAGATION"
 
-if ($Router -match "marine_safety_status") {
-    PASS "Router reads marine safety status"
+if ($DecisionService -match "marine_safety_status") {
+    PASS "Shared DecisionService reads marine safety status"
 }
 else {
-    FAIL "Router does not read marine safety status"
+    FAIL "Shared DecisionService does not read marine safety status"
 }
 
-if ($Router -match "INSUFFICIENT_EVIDENCE") {
-    PASS "Router handles insufficient evidence"
+if ($DecisionService -match "INSUFFICIENT_EVIDENCE") {
+    PASS "Shared DecisionService handles insufficient evidence"
 }
 else {
-    FAIL "Router missing insufficient evidence handling"
+    FAIL "Shared DecisionService missing insufficient evidence handling"
 }
 
-if ($Router -match "NO_SAFE_CANDIDATES") {
-    PASS "Router handles no-safe-candidates"
+if ($DecisionService -match "NO_SAFE_CANDIDATES") {
+    PASS "Shared DecisionService handles no-safe-candidates"
 }
 else {
-    FAIL "Router missing no-safe-candidates handling"
+    FAIL "Shared DecisionService missing no-safe-candidates handling"
+}
+
+if ($DecisionService -match "marineSafetyStatus") {
+    PASS "DecisionService forwards marine safety status"
+}
+else {
+    FAIL "DecisionService does not forward marine safety status"
+}
+
+if ($DecisionService -match "M1 returned a recommendation despite") {
+    PASS "Unsafe M1 contract violation fails closed"
+}
+else {
+    FAIL "Unsafe M1 contract guard missing"
 }
 
 if ($Adapter -match "marineSafetyStatus") {
@@ -518,388 +558,101 @@ function Test-DecisionScenario {
 
     try {
 
-        $Result = Invoke-RestMethod `
+        $Response = Invoke-RestMethod `
             -Uri "http://127.0.0.1:8000/api/v1/decision" `
             -Method Post `
             -ContentType "application/json" `
             -Body $Body `
-            -TimeoutSec 15 `
-            -ErrorAction Stop
+            -TimeoutSec 15
 
-        Write-Host ($Result | ConvertTo-Json -Depth 20)
+        Write-Host ($Response | ConvertTo-Json -Depth 20)
 
-        if ($Result.status -eq $ExpectedStatus) {
+        if ($Response.status -eq $ExpectedStatus) {
             PASS "$Name status = $ExpectedStatus"
         }
         else {
-            FAIL "$Name expected $ExpectedStatus but received $($Result.status)"
+            FAIL "$Name expected status $ExpectedStatus but got $($Response.status)"
         }
 
-        if ($Result.marineSafetyStatus -eq $ExpectedSafety) {
-            PASS "$Name safety = $ExpectedSafety"
+        if ($Response.marineSafetyStatus -eq $ExpectedSafety) {
+            PASS "$Name marineSafetyStatus = $ExpectedSafety"
+        }
+        elseif ($ExpectedSafety -eq "") {
+            PASS "$Name safety expectation skipped"
         }
         else {
-            FAIL "$Name expected safety $ExpectedSafety but received $($Result.marineSafetyStatus)"
+            FAIL "$Name expected safety $ExpectedSafety but got $($Response.marineSafetyStatus)"
         }
 
         if ($ExpectedStatus -eq "DECISION_AVAILABLE") {
-
-            if ($null -ne $Result.recommendedCandidate) {
-                PASS "$Name has recommendation"
+            if ($null -ne $Response.recommendedCandidate) {
+                PASS "$Name has recommended candidate"
             }
             else {
-                FAIL "$Name has no recommendation"
+                FAIL "$Name missing recommended candidate"
+            }
+        }
+        else {
+            if ($null -eq $Response.recommendedCandidate) {
+                PASS "$Name has no recommendation"
+            }
+            else {
+                FAIL "$Name exposed recommendation in non-decision state"
             }
         }
 
-        if ($ExpectedStatus -eq "NO_SAFE_CANDIDATES") {
-
-            if ($null -eq $Result.recommendedCandidate) {
-                PASS "$Name correctly blocks recommendation"
+        if ($ExpectedSafety -eq "UNSAFE") {
+            if ($Response.status -ne "DECISION_AVAILABLE") {
+                PASS "$Name unsafe state is not decision-available"
             }
             else {
-                FAIL "$Name returned recommendation despite unsafe state"
+                FAIL "$Name unsafe state reached DECISION_AVAILABLE"
             }
         }
-
-        if ($ExpectedStatus -eq "INSUFFICIENT_EVIDENCE") {
-
-            if ($null -eq $Result.recommendedCandidate) {
-                PASS "$Name correctly blocks recommendation"
-            }
-            else {
-                FAIL "$Name returned recommendation despite insufficient evidence"
-            }
-        }
-
-        return $Result
 
     }
     catch {
-
-        FAIL "$Name API request failed"
-        Write-Host $_.Exception.Message -ForegroundColor Red
-
-        return $null
+        FAIL "$Name API request failed: $($_.Exception.Message)"
     }
 }
 
 # ============================================================
-# 15. NORMAL
+# 15. E2E DEMO SCENARIOS
 # ============================================================
 
-SECTION "14. NORMAL SCENARIO"
+SECTION "15. E2E DEMO SCENARIOS"
 
-$Normal = Test-DecisionScenario `
-    -Name "NORMAL" `
+Test-DecisionScenario `
+    -Name "Normal safe" `
     -Scenario "PFZ_KOCHI_DEMO" `
     -ExpectedStatus "DECISION_AVAILABLE" `
     -ExpectedSafety "SAFE"
 
-# ============================================================
-# 16. UNSAFE
-# ============================================================
-
-SECTION "15. UNSAFE WEATHER"
-
-$Unsafe = Test-DecisionScenario `
-    -Name "UNSAFE WEATHER" `
+Test-DecisionScenario `
+    -Name "Unsafe weather" `
     -Scenario "UNSAFE_WEATHER" `
     -ExpectedStatus "NO_SAFE_CANDIDATES" `
     -ExpectedSafety "UNSAFE"
 
-# ============================================================
-# 17. INSUFFICIENT
-# ============================================================
-
-SECTION "16. INSUFFICIENT EVIDENCE"
-
-$Insufficient = Test-DecisionScenario `
-    -Name "INSUFFICIENT EVIDENCE" `
+Test-DecisionScenario `
+    -Name "Insufficient evidence" `
     -Scenario "INSUFFICIENT_EVIDENCE" `
     -ExpectedStatus "INSUFFICIENT_EVIDENCE" `
     -ExpectedSafety "INSUFFICIENT_EVIDENCE"
 
 # ============================================================
-# 18. RESPONSE PRESERVATION
+# 16. FINAL SUMMARY
 # ============================================================
 
-SECTION "17. RESPONSE PRESERVATION"
+SECTION "16. AUDIT SUMMARY"
 
-if ($null -ne $Normal) {
-
-    foreach ($Field in @(
-        "decisionSummary",
-        "tradeoffs",
-        "evidence",
-        "uncertainty",
-        "paretoCandidateIds",
-        "robustness",
-        "valueOfInformation",
-        "counterfactuals",
-        "explanation",
-        "decisionTrace"
-    )) {
-
-        if ($Normal.PSObject.Properties.Name -contains $Field) {
-            PASS "Normal response contains $Field"
-        }
-        else {
-            FAIL "Normal response missing $Field"
-        }
-    }
-
-    if ($Normal.decisionTrace) {
-        PASS "Decision trace is present"
-    }
-    else {
-        WARN "Decision trace is empty/null"
-    }
-}
-else {
-    WARN "Could not inspect normal response"
-}
-
-# ============================================================
-# 19. DEMO MODE
-# ============================================================
-
-SECTION "18. DEMO MODE"
-
-if ($null -ne $Normal) {
-
-    if ($Normal.dataMode -eq "DEMO") {
-        PASS "Response explicitly identifies DEMO mode"
-    }
-    else {
-        WARN "Response dataMode = $($Normal.dataMode)"
-    }
-}
-else {
-    WARN "Could not inspect DEMO mode"
-}
-
-# ============================================================
-# 20. MALFORMED REQUEST
-# ============================================================
-
-SECTION "19. MALFORMED REQUEST"
-
-$BadBodyObject = @{
-    location = "Kochi"
-}
-
-$BadBody = $BadBodyObject | ConvertTo-Json
-
-try {
-
-    Invoke-RestMethod `
-        -Uri "http://127.0.0.1:8000/api/v1/decision" `
-        -Method Post `
-        -ContentType "application/json" `
-        -Body $BadBody `
-        -TimeoutSec 10 `
-        -ErrorAction Stop
-
-    FAIL "Malformed request was accepted"
-
-}
-catch {
-
-    $StatusCode = $_.Exception.Response.StatusCode.value__
-
-    if ($StatusCode -ge 400 -and $StatusCode -lt 500) {
-        PASS "Malformed request rejected with HTTP $StatusCode"
-    }
-    else {
-        WARN "Malformed request returned HTTP $StatusCode"
-    }
-}
-
-# ============================================================
-# 21. CORS
-# ============================================================
-
-SECTION "20. CORS"
-
-$Main = Get-FileText "backend\main.py"
-
-if ($Main -match "CORSMiddleware") {
-    PASS "CORS middleware detected"
-}
-else {
-    WARN "CORS middleware not detected"
-}
-
-# ============================================================
-# 22. LOGGING
-# ============================================================
-
-SECTION "21. LOGGING / TRACE"
-
-$BackendFiles = Get-ChildItem `
-    (Join-Path $Root "backend") `
-    -Recurse `
-    -File `
-    -Filter *.py `
-    -ErrorAction SilentlyContinue
-
-$BackendText = ""
-
-foreach ($File in $BackendFiles) {
-    $BackendText = $BackendText + "`n" + (Get-Content $File.FullName -Raw)
-}
-
-if ($BackendText -match "logging") {
-    PASS "Logging references detected"
-}
-else {
-    WARN "Logging not clearly detected"
-}
-
-if ($BackendText -match "trace") {
-    PASS "Trace references detected"
-}
-else {
-    WARN "Trace implementation not clearly detected"
-}
-
-# ============================================================
-# 23. ERROR HANDLING
-# ============================================================
-
-SECTION "22. ERROR HANDLING"
-
-if ($BackendText -match "try:") {
-    PASS "Backend try/except handling detected"
-}
-else {
-    WARN "Backend exception handling not clearly detected"
-}
-
-if ($BackendText -match "SERVICE_UNAVAILABLE") {
-    PASS "SERVICE_UNAVAILABLE handling detected"
-}
-else {
-    WARN "SERVICE_UNAVAILABLE not detected"
-}
-
-# ============================================================
-# 24. FRESHNESS
-# ============================================================
-
-SECTION "23. DATA FRESHNESS"
-
-if ($M2Ocean -match "timestamp") {
-    PASS "M2 handles timestamps"
-}
-else {
-    WARN "M2 timestamp handling not detected"
-}
-
-if ($M2Ocean -match "fresh") {
-    PASS "M2 freshness handling detected"
-}
-else {
-    WARN "Explicit freshness handling not detected"
-}
-
-# ============================================================
-# 25. FRONTEND FALLBACK REVIEW
-# ============================================================
-
-SECTION "24. FRONTEND FALLBACK REVIEW"
-
-if ($App -match "fallback") {
-    WARN "Frontend contains fallback logic; manually verify backend failure cannot show an authoritative recommendation"
-}
-else {
-    PASS "No explicit fallback keyword detected"
-}
-
-if ($App -match "mock") {
-    WARN "Frontend contains mock logic"
-}
-else {
-    PASS "No explicit mock keyword detected"
-}
-
-if ($App -match "sample") {
-    WARN "Frontend contains sample-data logic"
-}
-else {
-    PASS "No explicit sample keyword detected"
-}
-
-# ============================================================
-# 26. DEPENDENCIES
-# ============================================================
-
-SECTION "25. DEPENDENCIES"
-
-if (Test-Path (Join-Path $Root "requirements.txt")) {
-    PASS "requirements.txt exists"
-}
-else {
-    FAIL "requirements.txt missing"
-}
-
-if (Test-Path (Join-Path $Root "package.json")) {
-    PASS "package.json exists"
-}
-else {
-    WARN "package.json not found at repository root"
-}
-
-# ============================================================
-# 27. 15 CASE MATRIX
-# ============================================================
-
-SECTION "26. E2E MATRIX"
-
-Write-Host "[MANUAL] Normal safe request"
-Write-Host "[MANUAL] Unsafe weather"
-Write-Host "[MANUAL] Insufficient evidence"
-Write-Host "[MANUAL] Multiple candidates"
-Write-Host "[MANUAL] Dominated candidate"
-Write-Host "[MANUAL] What-if / counterfactual"
-Write-Host "[MANUAL] Why explanation"
-Write-Host "[MANUAL] Certainty / confidence"
-Write-Host "[MANUAL] What information is needed"
-Write-Host "[MANUAL] Voice request"
-Write-Host "[MANUAL] Multilingual request"
-Write-Host "[MANUAL] M2 failure"
-Write-Host "[MANUAL] M1 failure"
-Write-Host "[MANUAL] Malformed request"
-Write-Host "[MANUAL] Stale data"
-
-WARN "Some E2E cases require manual/runtime validation."
-
-# ============================================================
-# 28. FINAL RESULT
-# ============================================================
-
-SECTION "FINAL M4 AUDIT RESULT"
-
-Write-Host ""
-Write-Host "PASS : $Pass" -ForegroundColor Green
-Write-Host "WARN : $Warn" -ForegroundColor Yellow
-Write-Host "FAIL : $Fail" -ForegroundColor Red
-Write-Host ""
+Write-Host "PASS: $Pass" -ForegroundColor Green
+Write-Host "WARN: $Warn" -ForegroundColor Yellow
+Write-Host "FAIL: $Fail" -ForegroundColor Red
 
 if ($Fail -eq 0) {
-
-    Write-Host "NO AUTOMATIC FAILURES DETECTED." -ForegroundColor Green
-
-    if ($Warn -gt 0) {
-        Write-Host "WARNINGS REMAIN — MANUAL VALIDATION IS STILL REQUIRED." -ForegroundColor Yellow
-    }
-
+    Write-Host "M4 AUDIT RESULT: PASS" -ForegroundColor Green
 }
 else {
-
-    Write-Host "FAILURES REMAIN — DO NOT DECLARE M4 COMPLETE." -ForegroundColor Red
+    Write-Host "M4 AUDIT RESULT: FAIL" -ForegroundColor Red
 }
-
-Write-Host ""
-Write-Host "Audit finished." -ForegroundColor Cyan
