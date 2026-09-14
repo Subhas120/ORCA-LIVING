@@ -1,6 +1,8 @@
 import json
 import os
 from datetime import datetime
+from agents.ocean.normalizer import normalize_observation
+from agents.ocean.validator import validate_observation
 
 from agents.common.agent_contract import AgentRequest, AgentResponse
 from agents.ocean.safety import assess_marine_safety
@@ -9,44 +11,8 @@ from agents.ocean.uncertainty import assess_uncertainty
 from agents.ocean.models.evidence import Evidence
 
 
-REQUIRED_FIELDS = [
-    "parameter",
-    "value",
-    "unit",
-    "latitude",
-    "longitude",
-    "timestamp",
-    "source",
-    "confidence",
-]
 
 
-def normalize_observation(observation: dict) -> dict:
-    """Convert a marine observation to ORCA's standard format."""
-    return {
-        "parameter": observation["parameter"],
-        "value": observation["value"],
-        "unit": observation["unit"],
-        "latitude": observation["latitude"],
-        "longitude": observation["longitude"],
-        "timestamp": observation["timestamp"],
-        "source": observation["source"],
-        "confidence": observation["confidence"],
-    }
-
-
-def validate_observation(observation: dict) -> bool:
-    """Return False when required observation fields are missing."""
-
-    for field in REQUIRED_FIELDS:
-
-        if field not in observation:
-            return False
-
-        if observation[field] is None:
-            return False
-
-    return True
 
 
 def get_marine_data() -> list[dict]:

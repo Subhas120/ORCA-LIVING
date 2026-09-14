@@ -1,23 +1,15 @@
-def normalize_observation(
-    parameter,
-    value,
-    unit,
-    latitude,
-    longitude,
-    timestamp,
-    source,
-    confidence
-):
+def normalize_observation(observation: dict) -> dict:
+    """
+    Convert a marine observation into ORCA's standard format.
+    """
 
-    observation = {
-        "parameter": parameter,
-        "value": value,
-        "unit": unit,
-        "latitude": latitude,
-        "longitude": longitude,
-        "timestamp": timestamp,
-        "source": source,
-        "confidence": confidence
+    return {
+        "parameter": observation["parameter"],
+        "value": observation["value"],
+        "unit": observation["unit"],
+        "latitude": observation["latitude"],
+        "longitude": observation["longitude"],
+        "timestamp": observation["timestamp"],
+        "source": observation["source"],
+        "confidence": observation["confidence"],
     }
-
-    return observation
