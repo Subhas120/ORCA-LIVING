@@ -1,42 +1,214 @@
-import { decisionState } from "./models/decisionState";
-import { candidates } from "./data/mockDecision";
+import { useEffect, useState } from "react";
+
+import { decisionState as demoDecisionState } from "./models/decisionState";
+import { candidates as demoCandidates } from "./data/mockDecision";
+
+import { getDecision } from "./services/decisionService";
+
 import MarineMap from "./components/map/MarineMap";
 import EvidencePanel from "./components/evidence/EvidencePanel";
 import WhatIfPanel from "./components/whatif/WhatIfPanel";
 import UncertaintyPanel from "./components/decision/UncertaintyPanel";
+import MarineConditions from "./components/decision/MarineConditions";
+
 
 function App() {
-  const recommended = decisionState.recommendedCandidate;
+  const [decision, setDecision] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+
+  /*
+   * M2 integration
+   *
+   * The frontend only attempts to call the backend
+   * when a real endpoint has been configured.
+   *
+   * Until then, the dashboard remains clearly
+   * labelled as SIMULATED DEMO.
+   */
+  useEffect(() => {
+    const endpoint =
+      import.meta.env.VITE_ORCA_OCEAN_ENDPOINT;
+
+    if (!endpoint) {
+      return;
+    }
+
+    async function loadDecision() {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const result = await getDecision({
+          query:
+            demoDecisionState.objective.text,
+
+          location: null,
+
+          destination: null,
+
+          date: null,
+
+          time:
+            demoDecisionState.objective.time,
+
+          activity: "fishing",
+        });
+
+        setDecision(result);
+      } catch (err) {
+        console.error(err);
+
+        setError(
+          err.message ||
+          "Unable to load ORCA decision."
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadDecision();
+  }, []);
+
+
+  /*
+   * Determine whether the dashboard is currently
+   * displaying a normalized M2 response.
+   */
+  const usingM2 = decision !== null;
+
+
+  const currentDecision =
+    usingM2
+      ? decision
+      : demoDecisionState;
+
+
+  const currentCandidates =
+    usingM2
+      ? decision.candidates
+      : demoCandidates;
+
+
+  const recommended =
+    usingM2
+      ? decision.recommendedCandidate
+      : demoDecisionState.recommendedCandidate;
+
 
   return (
     <div className="app">
 
+      {/* HEADER */}
+
       <header className="header">
+
         <div>
-          <h1>ORCA-LIVING</h1>
-          <p>Marine Decision Intelligence</p>
+          <h1>
+            ORCA-LIVING
+          </h1>
+
+          <p>
+            Marine Decision Intelligence
+          </p>
         </div>
+
 
         <div className="data-mode">
-          ● {decisionState.dataMode}
+
+          ◉{" "}
+
+          {usingM2
+            ? "M2 BACKEND"
+            : "SIMULATED DEMO"}
+
         </div>
+
       </header>
 
+
       <main className="dashboard">
+
+
+        {/* BACKEND STATUS */}
+
+        {loading && (
+
+          <section className="integration-status">
+
+            <strong>
+              CONNECTING TO ORCA BACKEND
+            </strong>
+
+            <span>
+              Loading the latest marine decision...
+            </span>
+
+          </section>
+
+        )}
+
+
+        {error && (
+
+          <section className="integration-status error">
+
+            <strong>
+              BACKEND UNAVAILABLE
+            </strong>
+
+            <span>
+              {error}
+            </span>
+
+          </section>
+
+        )}
+
+
+        {!usingM2 &&
+          !loading && (
+
+            <section className="integration-status demo">
+
+              <strong>
+                DEMO MODE
+              </strong>
+
+              <span>
+                {" "}
+                M2 HTTP endpoint is not configured.
+                {" "}
+                The dashboard is displaying clearly
+                labelled simulated demonstration data.
+              </span>
+
+            </section>
+
+          )}
+
 
         {/* USER OBJECTIVE */}
 
         <section className="objective">
-          <span>USER OBJECTIVE</span>
+
+          <span>
+            USER OBJECTIVE
+          </span>
 
           <h2>
-            {decisionState.objective.text}
+            {demoDecisionState.objective.text}
           </h2>
 
           <p>
-            Vessel: {decisionState.objective.vessel} ·{" "}
-            {decisionState.objective.time}
+            Vessel:{" "}
+            {demoDecisionState.objective.vessel}
+            {" · "}
+            {demoDecisionState.objective.time}
           </p>
+
         </section>
 
 
@@ -44,19 +216,30 @@ function App() {
 
         <section className="content-grid">
 
+
           {/* MARINE MAP */}
 
           <div className="map-panel">
 
             <div className="panel-title">
-              <span>MARINE MAP</span>
 
               <span>
-                {candidates.length} CANDIDATES
+                MARINE MAP
               </span>
+
+              <span>
+                {currentCandidates.length}
+                {" "}CANDIDATES
+              </span>
+
             </div>
 
-            <MarineMap candidates={candidates} />
+
+            <MarineMap
+              candidates={
+                currentCandidates
+              }
+            />
 
           </div>
 
@@ -72,7 +255,15 @@ function App() {
               </span>
 
               <span className="confidence">
-                {recommended.confidence}
+
+                {usingM2
+                  ? (
+                    currentDecision.confidence !== null
+                      ? `${currentDecision.confidence}%`
+                      : "UNKNOWN"
+                  )
+                  : recommended.confidence}
+
               </span>
 
             </div>
@@ -85,53 +276,136 @@ function App() {
               </span>
 
               <h2>
-                {recommended.name}
+                {recommended?.name ??
+                  "No recommendation"}
               </h2>
 
               <p>
-                {decisionState.decisionSummary}
+
+                {usingM2
+                  ? (
+                    currentDecision.recommendation
+                      ?.reason ??
+                    "Recommendation reason unavailable."
+                  )
+                  : demoDecisionState.decisionSummary}
+
               </p>
 
             </div>
+
+
+            {/* M2 MARINE SAFETY */}
+
+            {usingM2 && (
+
+              <div className="marine-safety">
+
+                <span>
+                  MARINE SAFETY
+                </span>
+
+                <strong>
+                  {currentDecision.marineSafety.status}
+                </strong>
+
+                {currentDecision.marineSafety
+                  .reasons?.map(
+                    (reason) => (
+                      <p key={reason}>
+                        {reason}
+                      </p>
+                    )
+                  )}
+
+              </div>
+
+            )}
 
 
             {/* DECISION METRICS */}
 
             <div className="metrics">
 
+
               <div>
-                <span>SAFETY</span>
+
+                <span>
+                  SAFETY
+                </span>
 
                 <strong>
-                  {recommended.safety}%
+
+                  {usingM2
+                    ? (
+                      currentDecision.marineSafety
+                        .status ?? "—"
+                    )
+                    : `${recommended.safety}%`}
+
                 </strong>
+
               </div>
 
 
               <div>
-                <span>OPPORTUNITY</span>
+
+                <span>
+                  OPPORTUNITY
+                </span>
 
                 <strong>
-                  {recommended.opportunity}%
+
+                  {usingM2
+                    ? (
+                      recommended.opportunityStatus
+                        ?.replace(
+                          "_",
+                          " "
+                        ) ?? "—"
+                    )
+                    : `${recommended.opportunity}%`}
+
                 </strong>
+
               </div>
 
 
               <div>
-                <span>UNCERTAINTY</span>
+
+                <span>
+                  UNCERTAINTY
+                </span>
 
                 <strong>
-                  {recommended.uncertainty}%
+
+                  {usingM2
+                    ? (
+                      currentDecision.uncertainty
+                        .level ?? "—"
+                    )
+                    : `${recommended.uncertainty}%`}
+
                 </strong>
+
               </div>
 
 
               <div>
-                <span>DISTANCE</span>
+
+                <span>
+                  DISTANCE
+                </span>
 
                 <strong>
-                  {recommended.distance} km
+
+                  {recommended?.distance !== null &&
+                  recommended?.distance !== undefined
+                    ? `${recommended.distance} km`
+                    : "—"}
+
                 </strong>
+
               </div>
 
             </div>
@@ -145,12 +419,38 @@ function App() {
                 WHY?
               </h3>
 
-              {decisionState.tradeoffs.map(
-                (tradeoff) => (
-                  <p key={tradeoff}>
-                    ✓ {tradeoff}
+
+              {usingM2 ? (
+
+                currentDecision.recommendation
+                  ?.reason ? (
+
+                  <p>
+                    ✓{" "}
+                    {currentDecision.recommendation.reason}
                   </p>
+
+                ) : (
+
+                  <p>
+                    No recommendation reason
+                    available.
+                  </p>
+
                 )
+
+              ) : (
+
+                demoDecisionState.tradeoffs.map(
+                  (tradeoff) => (
+
+                    <p key={tradeoff}>
+                      ✓ {tradeoff}
+                    </p>
+
+                  )
+                )
+
               )}
 
             </div>
@@ -160,7 +460,18 @@ function App() {
         </section>
 
 
-        {/* CANDIDATES */}
+        {/* MARINE CONDITIONS */}
+
+        <MarineConditions
+          conditions={
+            usingM2
+              ? currentDecision.marineConditions
+              : demoDecisionState.marineConditions
+          }
+        />
+
+
+        {/* CANDIDATES / PFZ */}
 
         <section className="candidates">
 
@@ -171,7 +482,7 @@ function App() {
             </h2>
 
             <span>
-              DECISION FRONTIER
+              PFZ LOCATIONS
             </span>
 
           </div>
@@ -179,12 +490,14 @@ function App() {
 
           <div className="candidate-grid">
 
-            {candidates.map(
+            {currentCandidates.map(
               (candidate) => (
 
                 <div
                   key={candidate.id}
-                  className={`candidate-card ${candidate.status.toLowerCase()}`}
+                  className={`candidate-card ${
+                    candidate.status.toLowerCase()
+                  }`}
                 >
 
                   <div className="candidate-header">
@@ -202,54 +515,92 @@ function App() {
 
                   <div className="candidate-stats">
 
-                    <div>
-                      <small>
-                        Safety
-                      </small>
-
-                      <strong>
-                        {candidate.safety}%
-                      </strong>
-                    </div>
-
 
                     <div>
-                      <small>
-                        Opportunity
-                      </small>
 
-                      <strong>
-                        {candidate.opportunity}%
-                      </strong>
-                    </div>
-
-
-                    <div>
-                      <small>
-                        Uncertainty
-                      </small>
-
-                      <strong>
-                        {candidate.uncertainty}%
-                      </strong>
-                    </div>
-
-
-                    <div>
                       <small>
                         Distance
                       </small>
 
                       <strong>
-                        {candidate.distance} km
+                        {candidate.distance ??
+                          "—"} km
                       </strong>
+
+                    </div>
+
+
+                    <div>
+
+                      <small>
+                        Opportunity
+                      </small>
+
+                      <strong>
+
+                        {usingM2
+                          ? (
+                            candidate.opportunityStatus ??
+                            "—"
+                          )
+                          : `${candidate.opportunity}%`}
+
+                      </strong>
+
+                    </div>
+
+
+                    <div>
+
+                      <small>
+                        Confidence
+                      </small>
+
+                      <strong>
+
+                        {candidate.confidence !== null &&
+                        candidate.confidence !== undefined
+                          ? `${candidate.confidence}%`
+                          : "—"}
+
+                      </strong>
+
+                    </div>
+
+
+                    <div>
+
+                      <small>
+                        Location
+                      </small>
+
+                      <strong>
+
+                        {candidate.lat !== undefined &&
+                        candidate.lng !== undefined
+                          ? (
+                            <>
+                              {candidate.lat.toFixed(2)}
+                              {"°, "}
+                              {candidate.lng.toFixed(2)}
+                              {"°"}
+                            </>
+                          )
+                          : "—"}
+
+                      </strong>
+
                     </div>
 
                   </div>
 
 
                   <p className="candidate-reason">
-                    {candidate.reason}
+
+                    {candidate.reason ??
+                      candidate.opportunityStatus ??
+                      ""}
+
                   </p>
 
                 </div>
@@ -266,22 +617,45 @@ function App() {
 
         <EvidencePanel
           candidate={recommended}
+
+          evidence={
+            usingM2
+              ? currentDecision.evidence
+              : demoDecisionState.evidence
+          }
+
+          dataMode={
+            usingM2
+              ? (
+                currentDecision.source ??
+                "M2 BACKEND"
+              )
+              : demoDecisionState.dataMode
+          }
         />
 
 
         {/* UNCERTAINTY */}
 
-        <UncertaintyPanel />
+        <UncertaintyPanel
+          uncertainty={
+            usingM2
+              ? currentDecision.uncertainty
+              : demoDecisionState.uncertainty
+          }
+        />
 
 
         {/* WHAT-IF */}
 
         <WhatIfPanel />
 
+
       </main>
 
     </div>
   );
 }
+
 
 export default App;

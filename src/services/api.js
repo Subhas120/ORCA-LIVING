@@ -1,78 +1,62 @@
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "";
-
 /*
- * M3 API SERVICE
+ * ORCA M3 API SERVICE
  *
- * This file is the only place where the frontend
- * communicates with the ORCA backend.
+ * The frontend communicates with the ORCA backend
+ * through this service only.
  *
- * The backend will provide REAL-TIME data.
- * We do not create or substitute mock data here.
+ * The actual backend endpoint is supplied through:
+ *
+ * VITE_ORCA_OCEAN_ENDPOINT
+ *
+ * We do not hard-code an endpoint because the
+ * M1/M2/M3 REST contract is not finalized yet.
  */
 
-async function request(endpoint, options = {}) {
+const OCEAN_ENDPOINT =
+  import.meta.env.VITE_ORCA_OCEAN_ENDPOINT || null;
+
+
+/*
+ * Send an AgentRequest to the backend.
+ *
+ * Expected request structure:
+ *
+ * {
+ *   query,
+ *   location,
+ *   destination,
+ *   date,
+ *   time,
+ *   activity
+ * }
+ */
+export async function requestOceanData(
+  request
+) {
+  if (!OCEAN_ENDPOINT) {
+    throw new Error(
+      "ORCA Ocean API endpoint is not configured."
+    );
+  }
+
   const response = await fetch(
-    `${API_BASE_URL}${endpoint}`,
+    OCEAN_ENDPOINT,
     {
-      ...options,
+      method: "POST",
+
       headers: {
         "Content-Type": "application/json",
-        ...options.headers,
       },
+
+      body: JSON.stringify(request),
     }
   );
 
   if (!response.ok) {
     throw new Error(
-      `API request failed: ${response.status} ${response.statusText}`
+      `ORCA backend request failed: ${response.status} ${response.statusText}`
     );
   }
 
   return response.json();
-}
-
-
-/*
- * Get the current ORCA decision state.
- *
- * The exact endpoint will be replaced with the
- * endpoint agreed upon by the backend team.
- */
-export async function getDecisionState() {
-  return request("/api/decision-state");
-}
-
-
-/*
- * Get the latest candidate information.
- */
-export async function getCandidates() {
-  return request("/api/candidates");
-}
-
-
-/*
- * Get the latest hazard information.
- */
-export async function getHazards() {
-  return request("/api/hazards");
-}
-
-
-/*
- * Get the latest evidence used by the decision engine.
- */
-export async function getEvidence(candidateId) {
-  return request(
-    `/api/evidence/${candidateId}`
-  );
-}
-
-
-/*
- * Health check for the backend.
- */
-export async function checkBackendHealth() {
-  return request("/api/health");
 }

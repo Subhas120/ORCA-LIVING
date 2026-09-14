@@ -1,45 +1,55 @@
-import { decisionState } from "../../models/decisionState";
 import { getUncertaintyLevel } from "../../utils/uncertainty";
 
-function UncertaintyPanel() {
-  const uncertainty = decisionState.uncertainty;
 
-  /*
-   * Backend-provided uncertainty level is authoritative.
-   *
-   * If a future backend response contains only a score,
-   * use the utility as a frontend fallback.
-   */
+function UncertaintyPanel({
+  uncertainty = {},
+}) {
+  const score =
+    uncertainty.score ??
+    null;
+
   const level =
-    uncertainty.level ||
-    getUncertaintyLevel(uncertainty.score);
+    uncertainty.level ??
+    (
+      score !== null
+        ? getUncertaintyLevel(score)
+        : "INSUFFICIENT"
+    );
+
 
   return (
     <section className="uncertainty-panel">
 
       <div className="panel-title">
-        <span>UNCERTAINTY</span>
+
+        <span>
+          UNCERTAINTY
+        </span>
 
         <span>
           {level}
         </span>
+
       </div>
 
 
       <div className="uncertainty-content">
 
-        {/* SCORE */}
 
         <div className="uncertainty-score">
 
           <div>
+
             <span>
-              UNCERTAINTY SCORE
+              UNCERTAINTY
             </span>
 
             <strong>
-              {uncertainty.score}%
+              {score !== null
+                ? `${score}%`
+                : "—"}
             </strong>
+
           </div>
 
 
@@ -47,7 +57,10 @@ function UncertaintyPanel() {
 
             <div
               style={{
-                width: `${uncertainty.score}%`,
+                width:
+                  score !== null
+                    ? `${score}%`
+                    : "0%",
               }}
             />
 
@@ -56,8 +69,6 @@ function UncertaintyPanel() {
         </div>
 
 
-        {/* EXPLANATION */}
-
         <div className="uncertainty-explanation">
 
           <h3>
@@ -65,13 +76,12 @@ function UncertaintyPanel() {
           </h3>
 
           <p>
-            {uncertainty.explanation}
+            {uncertainty.reason ??
+              "Uncertainty information is not currently available from the backend."}
           </p>
 
         </div>
 
-
-        {/* INTERPRETATION */}
 
         <div className="uncertainty-note">
 
@@ -80,10 +90,9 @@ function UncertaintyPanel() {
           </strong>
 
           <span>
-            Lower uncertainty means the available
-            evidence is more consistent. This value
-            represents uncertainty, not recommendation
-            quality.
+            Lower uncertainty indicates more
+            consistent evidence. Uncertainty is
+            separate from recommendation quality.
           </span>
 
         </div>
@@ -93,5 +102,6 @@ function UncertaintyPanel() {
     </section>
   );
 }
+
 
 export default UncertaintyPanel;

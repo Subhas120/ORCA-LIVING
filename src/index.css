@@ -814,3 +814,35 @@ input {
 
   line-height: 1.5;
 }
+/* ================================
+   MARINE CONDITIONS - UNAVAILABLE
+================================ */
+
+.conditions-unavailable {
+  background: #0c1218;
+  border: 1px solid #3a3a32;
+  border-radius: 10px;
+  padding: 18px;
+}
+
+.conditions-unavailable strong {
+  display: block;
+  font-size: 13px;
+  color: #d9bd58;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+
+.conditions-unavailable p {
+  margin: 0 0 10px;
+  color: #9eabb5;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.conditions-unavailable span {
+  display: block;
+  font-size: 11px;
+  color: #7f909f;
+  letter-spacing: 0.08em;
+}

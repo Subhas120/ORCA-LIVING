@@ -1,25 +1,22 @@
-function EvidencePanel({ candidate }) {
-  const evidence = [
-    {
-      id: "E1",
-      category: "Safety",
-      observation: "Wave height = 1.6 m",
-      source: "Ocean forecast",
-      timestamp: "2026-09-11 06:00",
-    },
-    {
-      id: "E2",
-      category: "Opportunity",
-      observation: "Favorable chlorophyll conditions",
-      source: "Satellite observation",
-      timestamp: "2026-09-11 05:30",
-    },
-  ];
+function formatConfidence(confidence) {
+  if (confidence === null || confidence === undefined) {
+    return "—";
+  }
 
+  if (typeof confidence === "number") {
+    return `${confidence}%`;
+  }
+
+  return confidence;
+}
+
+function EvidencePanel({
+  candidate,
+  evidence = [],
+  dataMode = "SIMULATED",
+}) {
   return (
     <section className="evidence-panel">
-
-      {/* HEADER */}
 
       <div className="panel-title">
         <span>EVIDENCE</span>
@@ -27,105 +24,172 @@ function EvidencePanel({ candidate }) {
       </div>
 
 
-      {/* SUMMARY */}
-
       <div className="evidence-summary">
 
         <div>
-          <h2>Why this location?</h2>
+          <h2>
+            Why this location?
+          </h2>
 
           <p>
-            The recommendation is supported by the
-            environmental evidence available to the
-            decision system.
+            The recommendation is supported by
+            environmental observations and their
+            associated provenance.
           </p>
         </div>
 
       </div>
 
 
-      {/* EVIDENCE ITEMS */}
-
       <div className="evidence-list">
 
-        {evidence.map((item) => (
+        {evidence.length > 0 ? (
 
-          <div
-            className="evidence-item"
-            key={item.id}
-          >
+          evidence.map((item, index) => (
+
+            <div
+              className="evidence-item"
+              key={
+                item.id ??
+                item.parameter ??
+                `evidence-${index}`
+              }
+            >
+
+              <div className="evidence-main">
+
+                <div className="evidence-category">
+                  {item.parameter ??
+                    item.category ??
+                    "Marine observation"}
+                </div>
+
+
+                <strong>
+                  {item.observation ??
+                    item.value ??
+                    item.parameter ??
+                    "Observation available"}
+                </strong>
+
+
+                <span>
+                  Source:{" "}
+                  {item.source ??
+                    "Unknown source"}
+                </span>
+
+
+                <span>
+                  Observed:{" "}
+                  {item.timestamp ??
+                    "Timestamp unavailable"}
+                </span>
+
+
+                {item.confidence !== null &&
+                  item.confidence !== undefined && (
+
+                    <span>
+                      Evidence confidence:{" "}
+                      {formatConfidence(item.confidence)}
+                    </span>
+
+                  )}
+
+              </div>
+
+
+              <div className="evidence-id">
+                {item.id ??
+                  item.parameter ??
+                  `E${index + 1}`}
+              </div>
+
+            </div>
+
+          ))
+
+        ) : (
+
+          <div className="evidence-item">
 
             <div className="evidence-main">
 
               <div className="evidence-category">
-                {item.category}
+                EVIDENCE UNAVAILABLE
               </div>
 
               <strong>
-                {item.observation}
+                No evidence records are currently
+                available.
               </strong>
 
               <span>
-                Source: {item.source}
+                The backend has not supplied evidence
+                for this decision.
               </span>
 
-              <span>
-                Observed: {item.timestamp}
-              </span>
-
-            </div>
-
-            <div className="evidence-id">
-              {item.id}
             </div>
 
           </div>
 
-        ))}
+        )}
 
       </div>
 
 
-      {/* DECISION SIGNALS */}
-
       <div className="evidence-signals">
-
-        <div>
-          <span>SAFETY</span>
-
-          <strong>
-            {candidate.safety}%
-          </strong>
-        </div>
-
-        <div>
-          <span>OPPORTUNITY</span>
-
-          <strong>
-            {candidate.opportunity}%
-          </strong>
-        </div>
-
-        <div>
-          <span>UNCERTAINTY</span>
-
-          <strong>
-            {candidate.uncertainty}%
-          </strong>
-        </div>
 
         <div>
           <span>DISTANCE</span>
 
           <strong>
-            {candidate.distance} km
+            {candidate?.distance !== null &&
+            candidate?.distance !== undefined
+              ? `${candidate.distance} km`
+              : "—"}
+          </strong>
+        </div>
+
+
+        <div>
+          <span>OPPORTUNITY</span>
+
+          <strong>
+            {candidate?.opportunityStatus ??
+              (candidate?.opportunity !== null &&
+              candidate?.opportunity !== undefined
+                ? `${candidate.opportunity}%`
+                : "—")}
+          </strong>
+        </div>
+
+
+        <div>
+          <span>CONFIDENCE</span>
+
+          <strong>
+            {formatConfidence(
+              candidate?.confidence
+            )}
+          </strong>
+        </div>
+
+
+        <div>
+          <span>LOCATION</span>
+
+          <strong>
+            {candidate?.lat !== undefined &&
+            candidate?.lng !== undefined
+              ? `${candidate.lat.toFixed(2)}°, ${candidate.lng.toFixed(2)}°`
+              : "—"}
           </strong>
         </div>
 
       </div>
 
-
-      {/* DATA STATUS */}
 
       <div className="evidence-footer">
 
@@ -133,9 +197,10 @@ function EvidencePanel({ candidate }) {
           <span>DATA MODE</span>
 
           <strong>
-            SIMULATED
+            {dataMode}
           </strong>
         </div>
+
 
         <div>
           <span>PROVENANCE</span>
