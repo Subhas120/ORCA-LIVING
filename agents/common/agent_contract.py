@@ -18,6 +18,13 @@ class AgentRequest:
     time: Optional[str] = None
     activity: Optional[str] = None
 
+    # Optional deterministic scenario selector.
+    #
+    # This is primarily useful for the reproducible ORCA demo/test
+    # scenarios. M2 remains responsible for interpreting the scenario
+    # and producing the corresponding scientific/safety result.
+    scenario_id: Optional[str] = None
+
     def __post_init__(self):
         if not self.query or not self.query.strip():
             raise ValueError("query cannot be empty")
@@ -28,8 +35,6 @@ class AgentResponse:
     agent: str
     status: str
     data: dict[str, Any] = field(default_factory=dict)
-    source: Optional[str] = None
-    timestamp: Optional[str] = None
     location: Optional[str] = None
     confidence: Optional[float] = None
     error: Optional[str] = None

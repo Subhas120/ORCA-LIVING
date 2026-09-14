@@ -1,6 +1,8 @@
 import json
 import os
+from copy import deepcopy
 from datetime import datetime
+
 from agents.ocean.normalizer import normalize_observation
 from agents.ocean.validator import validate_observation
 
@@ -11,8 +13,9 @@ from agents.ocean.uncertainty import assess_uncertainty
 from agents.ocean.models.evidence import Evidence
 
 
-
-
+DEFAULT_SCENARIO = "PFZ_KOCHI_DEMO"
+UNSAFE_WEATHER_SCENARIO = "UNSAFE_WEATHER"
+INSUFFICIENT_EVIDENCE_SCENARIO = "INSUFFICIENT_EVIDENCE"
 
 
 def get_marine_data() -> list[dict]:
@@ -31,7 +34,6 @@ def get_marine_data() -> list[dict]:
     marine_data = []
 
     for observation in raw_data:
-
         normalized = normalize_observation(observation)
 
         if validate_observation(normalized):
@@ -52,6 +54,56 @@ def get_pfz_data() -> list[dict]:
 
     with open(data_path, "r", encoding="utf-8") as file:
         return json.load(file)
+
+
+def apply_demo_scenario(
+    marine_data: list[dict],
+    scenario_id: str | None,
+) -> list[dict]:
+    """
+    Apply a deterministic demo scenario to M2 prototype data.
+
+    Scenario selection belongs to M2. The actual marine safety
+    decision continues to be performed by assess_marine_safety().
+    """
+
+    scenario = (
+        scenario_id or DEFAULT_SCENARIO
+    ).strip().upper()
+
+    data = deepcopy(marine_data)
+
+    if scenario in {
+        DEFAULT_SCENARIO,
+        "NORMAL",
+    }:
+        return data
+
+    if scenario == UNSAFE_WEATHER_SCENARIO:
+
+        for observation in data:
+
+            if observation["parameter"] == "wave_height":
+                observation["value"] = 3.5
+
+            elif observation["parameter"] == "ocean_current":
+                observation["value"] = 0.6
+
+        return data
+
+    if scenario == INSUFFICIENT_EVIDENCE_SCENARIO:
+
+        for observation in data:
+
+            if observation["parameter"] == "wave_height":
+                observation["value"] = None
+
+        return data
+
+    # Unknown scenario:
+    # preserve deterministic normal demo data rather than
+    # inventing a marine state.
+    return data
 
 
 def get_parameter_value(
@@ -93,11 +145,19 @@ def handle_ocean(request: AgentRequest) -> AgentResponse:
     """
     M2 Ocean Agent entry point.
 
-    Accepts M1's AgentRequest and returns the
-    shared AgentResponse contract.
+    M2 owns:
+    - marine observations
+    - marine safety assessment
+    - hazards
+    - evidence
+    - uncertainty
     """
 
     try:
+
+        # ---------------------------------------------------------
+        # 1. Load M2 prototype data
+        # ---------------------------------------------------------
         marine_data = get_marine_data()
         pfz_data = get_pfz_data()
 
@@ -107,13 +167,22 @@ def handle_ocean(request: AgentRequest) -> AgentResponse:
                 agent="ocean",
                 status="unavailable",
                 data={},
-                source="Sample Marine Dataset",
-                timestamp=datetime.now().isoformat(),
                 location=request.location,
                 confidence=0.0,
                 error="No valid marine observations available",
             )
 
+        # ---------------------------------------------------------
+        # 2. Apply deterministic scenario inside M2
+        # ---------------------------------------------------------
+        marine_data = apply_demo_scenario(
+            marine_data,
+            request.scenario_id,
+        )
+
+        # ---------------------------------------------------------
+        # 3. Read safety-critical marine values
+        # ---------------------------------------------------------
         wave_height = get_parameter_value(
             marine_data,
             "wave_height",
@@ -124,30 +193,50 @@ def handle_ocean(request: AgentRequest) -> AgentResponse:
             "ocean_current",
         )
 
+        # ---------------------------------------------------------
+        # 4. M2 authoritative safety evaluation
+        # ---------------------------------------------------------
         marine_safety = assess_marine_safety(
             wave_height,
             current_speed,
         )
 
+        # ---------------------------------------------------------
+        # 5. PFZ recommendation
+        # ---------------------------------------------------------
         pfz_recommendation = get_pfz_recommendation(
             pfz_data
         )
 
+        # ---------------------------------------------------------
+        # 6. Evidence
+        # ---------------------------------------------------------
         evidence = build_evidence(
             marine_data
         )
 
+        # ---------------------------------------------------------
+        # 7. Confidence / uncertainty
+        # ---------------------------------------------------------
         confidence_values = [
             observation["confidence"]
             for observation in marine_data
+            if observation.get("value") is not None
         ]
 
-        confidence = min(confidence_values)
+        confidence = (
+            min(confidence_values)
+            if confidence_values
+            else 0.0
+        )
 
         uncertainty = assess_uncertainty(
             confidence
         )
 
+        # ---------------------------------------------------------
+        # 8. Assemble M2 response
+        # ---------------------------------------------------------
         data = {
 
             "sst": get_parameter_value(
@@ -191,8 +280,6 @@ def handle_ocean(request: AgentRequest) -> AgentResponse:
             agent="ocean",
             status="success",
             data=data,
-            source=", ".join(sources),
-            timestamp=datetime.now().isoformat(),
             location=request.location,
             confidence=confidence,
         )
@@ -203,7 +290,6 @@ def handle_ocean(request: AgentRequest) -> AgentResponse:
             agent="ocean",
             status="unavailable",
             data={},
-            timestamp=datetime.now().isoformat(),
             location=request.location,
             confidence=0.0,
             error=f"Marine data source unavailable: {exc}",
@@ -219,7 +305,6 @@ def handle_ocean(request: AgentRequest) -> AgentResponse:
             agent="ocean",
             status="error",
             data={},
-            timestamp=datetime.now().isoformat(),
             location=request.location,
             confidence=0.0,
             error=f"Invalid marine data: {exc}",
@@ -231,7 +316,6 @@ def handle_ocean(request: AgentRequest) -> AgentResponse:
             agent="ocean",
             status="error",
             data={},
-            timestamp=datetime.now().isoformat(),
             location=request.location,
             confidence=0.0,
             error=str(exc),
@@ -247,6 +331,7 @@ if __name__ == "__main__":
         date="tomorrow",
         time="morning",
         activity="fishing",
+        scenario_id=DEFAULT_SCENARIO,
     )
 
     response = handle_ocean(request)
@@ -257,8 +342,7 @@ if __name__ == "__main__":
     print("Status:", response.status)
     print("Location:", response.location)
     print("Confidence:", response.confidence)
-    print("Source:", response.source)
-    print("Data:", response.data)
+    print("Source:", response.data)
 
     if response.error:
         print("Error:", response.error)

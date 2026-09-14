@@ -1,6 +1,7 @@
 ﻿"""M4 Adapter for M2 Marine Agent.
 
 M4 performs structural contract adaptation only.
+
 Scientific marine safety remains authoritative from M2.
 """
 
@@ -60,6 +61,7 @@ class M2Adapter:
             date=request.date,
             time=request.time,
             activity=request.activity,
+            scenario_id=request.scenario_id,
         )
 
         # ---------------------------------------------------------
@@ -145,7 +147,7 @@ class M2Adapter:
             confidence = candidate.get("confidence")
 
             # -----------------------------------------------------
-            # M2 confidence is already normalized between 0 and 1.
+            # M2 confidence is normalized between 0 and 1.
             # M1 expected_opportunity requires the same range.
             # -----------------------------------------------------
             if confidence is None:
@@ -200,7 +202,12 @@ class M2Adapter:
         # ---------------------------------------------------------
         # 6. Ensure candidates exist
         # ---------------------------------------------------------
-        if not proposals:
+        #
+        # For INSUFFICIENT_EVIDENCE we intentionally return the
+        # structured M2 status instead of silently manufacturing
+        # candidates.
+        #
+        if not proposals and safety_status != "INSUFFICIENT_EVIDENCE":
             raise InsufficientEvidenceError(
                 "M2 returned no valid PFZ candidates"
             )
@@ -248,6 +255,10 @@ class M2Adapter:
         # ---------------------------------------------------------
         # 8. Convert M2 safety into M1 SafetyEvaluation
         # ---------------------------------------------------------
+        #
+        # Every M1 candidate receives the M2-authoritative marine
+        # safety result. M4 does not reinterpret the science.
+        #
         safety_evaluations = tuple(
             SafetyEvaluation(
                 candidate_id=proposal.id,
