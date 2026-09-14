@@ -1,408 +1,188 @@
-import json
-import os
-from datetime import datetime
+import unittest
 
 from agents.common.agent_contract import AgentRequest, AgentResponse
+from agents.ocean.ocean_agent import (
+    get_marine_data,
+    get_pfz_data,
+    handle_ocean,
+    normalize_observation,
+    validate_observation,
+)
 from agents.ocean.safety import assess_marine_safety
 from agents.ocean.recommendation import get_pfz_recommendation
-from agents.ocean.models.evidence import Evidence
-
-
-REQUIRED_FIELDS = [
-    "parameter",
-    "value",
-    "unit",
-    "latitude",
-    "longitude",
-    "timestamp",
-    "source",
-    "confidence",
-]
-
-
-def normalize_observation(observation: dict) -> dict:
-    """Convert a marine observation to ORCA's standard format."""
-
-    return {
-        "parameter": observation["parameter"],
-        "value": observation["value"],
-        "unit": observation["unit"],
-        "latitude": observation["latitude"],
-        "longitude": observation["longitude"],
-        "timestamp": observation["timestamp"],
-        "source": observation["source"],
-        "confidence": observation["confidence"],
-    }
-
-
-def validate_observation(observation: dict) -> bool:
-    """Return False when required observation fields are missing."""
-
-    for field in REQUIRED_FIELDS:
-
-        if field not in observation:
-            return False
-
-        if observation[field] is None:
-            return False
-
-    return True
-
-
-def get_marine_data() -> list[dict]:
-    """Load and validate prototype marine observations."""
-
-    base_dir = os.path.dirname(
-        os.path.abspath(__file__)
-    )
-
-    data_path = os.path.join(
-        base_dir,
-        "../../data/sample/marine_data.json",
-    )
-
-    with open(
-        data_path,
-        "r",
-        encoding="utf-8",
-    ) as file:
-
-        raw_data = json.load(file)
-
-    marine_data = []
-
-    for observation in raw_data:
-
-        normalized = normalize_observation(
-            observation
-        )
-
-        if validate_observation(normalized):
-
-            marine_data.append(
-                normalized
-            )
-
-    return marine_data
-
-
-def get_pfz_data() -> list[dict]:
-    """Load prototype Potential Fishing Zone data."""
-
-    base_dir = os.path.dirname(
-        os.path.abspath(__file__)
-    )
-
-    data_path = os.path.join(
-        base_dir,
-        "../../data/sample/pfz_data.json",
-    )
-
-    with open(
-        data_path,
-        "r",
-        encoding="utf-8",
-    ) as file:
-
-        return json.load(file)
-
-
-def get_parameter_value(
-    marine_data: list[dict],
-    parameter: str,
-):
-    """Get the value for a requested marine parameter."""
-
-    for observation in marine_data:
-
-        if observation["parameter"] == parameter:
-
-            return observation["value"]
-
-    return None
-
-
-def build_evidence(
-    marine_data: list[dict],
-) -> dict:
-    """
-    Build evidence metadata for every
-    marine observation.
-    """
-
-    evidence = {}
-
-    for observation in marine_data:
-
-        item = Evidence(
-            parameter=observation["parameter"],
-            source=observation["source"],
-            timestamp=observation["timestamp"],
-            confidence=observation["confidence"],
-        )
-
-        evidence[
-            observation["parameter"]
-        ] = item.to_dict()
-
-    return evidence
-
-
-def handle_ocean(
-    request: AgentRequest,
-) -> AgentResponse:
-    """
-    M2 Ocean Agent entry point.
-
-    Accepts M1's AgentRequest and returns
-    the shared AgentResponse contract.
-    """
-
-    try:
-
-        marine_data = get_marine_data()
-
-        pfz_data = get_pfz_data()
-
-        if not marine_data:
-
-            return AgentResponse(
-                agent="ocean",
-                status="unavailable",
-                data={},
-                source="Sample Marine Dataset",
-                timestamp=datetime.now().isoformat(),
-                location=request.location,
-                confidence=0.0,
-                error=(
-                    "No valid marine observations "
-                    "available"
-                ),
-            )
-
-        wave_height = get_parameter_value(
-            marine_data,
-            "wave_height",
-        )
-
-        current_speed = get_parameter_value(
-            marine_data,
-            "ocean_current",
-        )
-
-        marine_safety = assess_marine_safety(
-            wave_height,
-            current_speed,
-        )
-
-        pfz_recommendation = (
-            get_pfz_recommendation(
-                pfz_data
-            )
-        )
-
-        evidence = build_evidence(
-            marine_data
-        )
-
-        data = {
-
-            "sst": get_parameter_value(
-                marine_data,
-                "sea_surface_temperature",
-            ),
-
-            "chlorophyll": get_parameter_value(
-                marine_data,
-                "chlorophyll",
-            ),
-
-            "wave_height": wave_height,
-
-            "wave_period": get_parameter_value(
-                marine_data,
-                "wave_period",
-            ),
-
-            "current_speed": current_speed,
-
-            "marine_safety": marine_safety,
-
-            "pfz": pfz_data,
-
-            "pfz_recommendation":
-                pfz_recommendation,
-
-            "evidence": evidence,
+from agents.ocean.uncertainty import assess_uncertainty
+
+
+class TestOceanAgent(unittest.TestCase):
+
+    def test_normalize_observation(self):
+        observation = {
+            "parameter": "wave_height",
+            "value": 1.2,
+            "unit": "meters",
+            "latitude": 9.9312,
+            "longitude": 76.2673,
+            "timestamp": "2026-09-10T10:00:00",
+            "source": "Test Source",
+            "confidence": 0.9,
         }
 
-        confidence_values = [
+        result = normalize_observation(observation)
 
-            observation["confidence"]
+        self.assertEqual(result["parameter"], "wave_height")
+        self.assertEqual(result["value"], 1.2)
+        self.assertEqual(result["unit"], "meters")
+        self.assertEqual(result["source"], "Test Source")
+        self.assertEqual(result["confidence"], 0.9)
 
-            for observation in marine_data
+    def test_valid_observation(self):
+        observation = {
+            "parameter": "wave_height",
+            "value": 1.2,
+            "unit": "meters",
+            "latitude": 9.9312,
+            "longitude": 76.2673,
+            "timestamp": "2026-09-10T10:00:00",
+            "source": "Test Source",
+            "confidence": 0.9,
+        }
 
-        ]
+        self.assertTrue(validate_observation(observation))
 
-        confidence = min(
-            confidence_values
+    def test_invalid_observation(self):
+        observation = {
+            "parameter": "wave_height",
+            "value": 1.2,
+            "unit": "meters",
+            "latitude": 9.9312,
+            "longitude": 76.2673,
+            "timestamp": "2026-09-10T10:00:00",
+            "source": "Test Source",
+        }
+
+        self.assertFalse(validate_observation(observation))
+
+    def test_marine_data_loading(self):
+        data = get_marine_data()
+
+        self.assertGreater(len(data), 0)
+
+        for observation in data:
+            self.assertTrue(validate_observation(observation))
+
+    def test_pfz_data_loading(self):
+        pfz_data = get_pfz_data()
+
+        self.assertGreater(len(pfz_data), 0)
+        self.assertIn("pfz_id", pfz_data[0])
+        self.assertIn("latitude", pfz_data[0])
+        self.assertIn("longitude", pfz_data[0])
+
+    def test_ocean_agent_returns_agent_response(self):
+        request = AgentRequest(
+            query="What are the marine conditions near Kochi?",
+            location="Kochi",
+            date="tomorrow",
+            time="morning",
+            activity="fishing",
         )
 
-        sources = sorted(
-            {
+        response = handle_ocean(request)
 
-                observation["source"]
+        self.assertIsInstance(response, AgentResponse)
+        self.assertEqual(response.agent, "ocean")
+        self.assertEqual(response.status, "success")
+        self.assertEqual(response.location, "Kochi")
 
-                for observation in marine_data
-
-            }
+    def test_confidence_range(self):
+        request = AgentRequest(
+            query="What are the marine conditions near Kochi?",
+            location="Kochi",
         )
 
-        return AgentResponse(
+        response = handle_ocean(request)
 
-            agent="ocean",
+        self.assertIsNotNone(response.confidence)
+        self.assertGreaterEqual(response.confidence, 0.0)
+        self.assertLessEqual(response.confidence, 1.0)
 
-            status="success",
+    def test_marine_safety_safe(self):
+        result = assess_marine_safety(1.2, 0.6)
 
-            data=data,
+        self.assertEqual(result["status"], "SAFE")
+        self.assertEqual(result["hazards"], [])
 
-            source=", ".join(sources),
+    def test_marine_safety_unsafe(self):
+        result = assess_marine_safety(3.0, 2.0)
 
-            timestamp=datetime.now().isoformat(),
+        self.assertEqual(result["status"], "UNSAFE")
+        self.assertIn("HIGH_WAVE_HEIGHT", result["hazards"])
+        self.assertIn("STRONG_OCEAN_CURRENT", result["hazards"])
 
-            location=request.location,
+    def test_marine_safety_insufficient_evidence(self):
+        result = assess_marine_safety(None, 0.6)
 
-            confidence=confidence,
+        self.assertEqual(
+            result["status"],
+            "INSUFFICIENT_EVIDENCE"
         )
 
-    except FileNotFoundError as exc:
+    def test_pfz_recommendation(self):
+        pfz_data = get_pfz_data()
+        result = get_pfz_recommendation(pfz_data)
 
-        return AgentResponse(
+        self.assertIn("recommended", result)
+        self.assertIn("alternatives", result)
+        self.assertIn("rejected", result)
 
-            agent="ocean",
+    def test_pfz_ranking(self):
+        pfz_data = get_pfz_data()
+        result = get_pfz_recommendation(pfz_data)
 
-            status="unavailable",
-
-            data={},
-
-            timestamp=datetime.now().isoformat(),
-
-            location=request.location,
-
-            confidence=0.0,
-
-            error=(
-                f"Marine data source "
-                f"unavailable: {exc}"
-            ),
+        self.assertEqual(
+            result["recommended"]["pfz_id"],
+            "PFZ_KOCHI_02"
         )
 
-    except (
-        json.JSONDecodeError,
-        KeyError,
-        TypeError,
-    ) as exc:
-
-        return AgentResponse(
-
-            agent="ocean",
-
-            status="error",
-
-            data={},
-
-            timestamp=datetime.now().isoformat(),
-
-            location=request.location,
-
-            confidence=0.0,
-
-            error=(
-                f"Invalid marine data: {exc}"
-            ),
+    def test_ocean_agent_contains_recommendation(self):
+        request = AgentRequest(
+            query="Find a fishing zone near Kochi",
+            location="Kochi",
         )
 
-    except Exception as exc:
+        response = handle_ocean(request)
 
-        return AgentResponse(
-
-            agent="ocean",
-
-            status="error",
-
-            data={},
-
-            timestamp=datetime.now().isoformat(),
-
-            location=request.location,
-
-            confidence=0.0,
-
-            error=str(exc),
+        self.assertIn(
+            "pfz_recommendation",
+            response.data
         )
+
+    def test_uncertainty_low(self):
+        result = assess_uncertainty(0.9)
+
+        self.assertEqual(result["level"], "LOW")
+
+    def test_uncertainty_medium(self):
+        result = assess_uncertainty(0.75)
+
+        self.assertEqual(result["level"], "MEDIUM")
+
+    def test_uncertainty_high(self):
+        result = assess_uncertainty(0.5)
+
+        self.assertEqual(result["level"], "HIGH")
+
+    def test_ocean_agent_contains_uncertainty(self):
+        request = AgentRequest(
+            query="What are the marine conditions near Kochi?",
+            location="Kochi",
+        )
+
+        response = handle_ocean(request)
+
+        self.assertIn("uncertainty", response.data)
+        self.assertIn("level", response.data["uncertainty"])
 
 
 if __name__ == "__main__":
-
-    request = AgentRequest(
-
-        query=(
-            "What are the marine "
-            "conditions near Kochi?"
-        ),
-
-        location="Kochi",
-
-        destination=None,
-
-        date="tomorrow",
-
-        time="morning",
-
-        activity="fishing",
-    )
-
-    response = handle_ocean(
-        request
-    )
-
-    print("\nORCA OCEAN AGENT")
-
-    print("----------------")
-
-    print(
-        "Agent:",
-        response.agent
-    )
-
-    print(
-        "Status:",
-        response.status
-    )
-
-    print(
-        "Location:",
-        response.location
-    )
-
-    print(
-        "Confidence:",
-        response.confidence
-    )
-
-    print(
-        "Source:",
-        response.source
-    )
-
-    print(
-        "Data:",
-        response.data
-    )
-
-    if response.error:
-
-        print(
-            "Error:",
-            response.error
-        )
+    unittest.main()

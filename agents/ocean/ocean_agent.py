@@ -5,6 +5,7 @@ from datetime import datetime
 from agents.common.agent_contract import AgentRequest, AgentResponse
 from agents.ocean.safety import assess_marine_safety
 from agents.ocean.recommendation import get_pfz_recommendation
+from agents.ocean.uncertainty import assess_uncertainty
 from agents.ocean.models.evidence import Evidence
 
 
@@ -36,7 +37,9 @@ def normalize_observation(observation: dict) -> dict:
 
 def validate_observation(observation: dict) -> bool:
     """Return False when required observation fields are missing."""
+
     for field in REQUIRED_FIELDS:
+
         if field not in observation:
             return False
 
@@ -48,6 +51,7 @@ def validate_observation(observation: dict) -> bool:
 
 def get_marine_data() -> list[dict]:
     """Load and validate prototype marine observations."""
+
     base_dir = os.path.dirname(os.path.abspath(__file__))
 
     data_path = os.path.join(
@@ -61,6 +65,7 @@ def get_marine_data() -> list[dict]:
     marine_data = []
 
     for observation in raw_data:
+
         normalized = normalize_observation(observation)
 
         if validate_observation(normalized):
@@ -71,6 +76,7 @@ def get_marine_data() -> list[dict]:
 
 def get_pfz_data() -> list[dict]:
     """Load prototype Potential Fishing Zone data."""
+
     base_dir = os.path.dirname(os.path.abspath(__file__))
 
     data_path = os.path.join(
@@ -87,49 +93,50 @@ def get_parameter_value(
     parameter: str,
 ):
     """Get the value for a requested marine parameter."""
+
     for observation in marine_data:
+
         if observation["parameter"] == parameter:
             return observation["value"]
 
     return None
 
 
-def get_evidence(
+def build_evidence(
     marine_data: list[dict],
 ) -> dict:
-    """
-    Build evidence and provenance information
-    for each marine observation.
-    """
-    evidence_data = {}
+    """Build evidence metadata for marine observations."""
+
+    evidence = {}
 
     for observation in marine_data:
-        evidence = Evidence(
+
+        item = Evidence(
             parameter=observation["parameter"],
             source=observation["source"],
             timestamp=observation["timestamp"],
             confidence=observation["confidence"],
         )
 
-        evidence_data[
-            observation["parameter"]
-        ] = evidence.to_dict()
+        evidence[observation["parameter"]] = item.to_dict()
 
-    return evidence_data
+    return evidence
 
 
 def handle_ocean(request: AgentRequest) -> AgentResponse:
     """
     M2 Ocean Agent entry point.
 
-    Accepts M1's AgentRequest and returns M1's
+    Accepts M1's AgentRequest and returns the
     shared AgentResponse contract.
     """
+
     try:
         marine_data = get_marine_data()
         pfz_data = get_pfz_data()
 
         if not marine_data:
+
             return AgentResponse(
                 agent="ocean",
                 status="unavailable",
@@ -160,28 +167,9 @@ def handle_ocean(request: AgentRequest) -> AgentResponse:
             pfz_data
         )
 
-        evidence = get_evidence(marine_data)
-
-        data = {
-            "sst": get_parameter_value(
-                marine_data,
-                "sea_surface_temperature",
-            ),
-            "chlorophyll": get_parameter_value(
-                marine_data,
-                "chlorophyll",
-            ),
-            "wave_height": wave_height,
-            "wave_period": get_parameter_value(
-                marine_data,
-                "wave_period",
-            ),
-            "current_speed": current_speed,
-            "marine_safety": marine_safety,
-            "pfz": pfz_data,
-            "pfz_recommendation": pfz_recommendation,
-            "evidence": evidence,
-        }
+        evidence = build_evidence(
+            marine_data
+        )
 
         confidence_values = [
             observation["confidence"]
@@ -189,6 +177,42 @@ def handle_ocean(request: AgentRequest) -> AgentResponse:
         ]
 
         confidence = min(confidence_values)
+
+        uncertainty = assess_uncertainty(
+            confidence
+        )
+
+        data = {
+
+            "sst": get_parameter_value(
+                marine_data,
+                "sea_surface_temperature",
+            ),
+
+            "chlorophyll": get_parameter_value(
+                marine_data,
+                "chlorophyll",
+            ),
+
+            "wave_height": wave_height,
+
+            "wave_period": get_parameter_value(
+                marine_data,
+                "wave_period",
+            ),
+
+            "current_speed": current_speed,
+
+            "marine_safety": marine_safety,
+
+            "uncertainty": uncertainty,
+
+            "pfz": pfz_data,
+
+            "pfz_recommendation": pfz_recommendation,
+
+            "evidence": evidence,
+        }
 
         sources = sorted(
             {
@@ -208,6 +232,7 @@ def handle_ocean(request: AgentRequest) -> AgentResponse:
         )
 
     except FileNotFoundError as exc:
+
         return AgentResponse(
             agent="ocean",
             status="unavailable",
@@ -218,7 +243,12 @@ def handle_ocean(request: AgentRequest) -> AgentResponse:
             error=f"Marine data source unavailable: {exc}",
         )
 
-    except (json.JSONDecodeError, KeyError, TypeError) as exc:
+    except (
+        json.JSONDecodeError,
+        KeyError,
+        TypeError,
+    ) as exc:
+
         return AgentResponse(
             agent="ocean",
             status="error",
@@ -230,6 +260,7 @@ def handle_ocean(request: AgentRequest) -> AgentResponse:
         )
 
     except Exception as exc:
+
         return AgentResponse(
             agent="ocean",
             status="error",
@@ -242,6 +273,7 @@ def handle_ocean(request: AgentRequest) -> AgentResponse:
 
 
 if __name__ == "__main__":
+
     request = AgentRequest(
         query="What are the marine conditions near Kochi?",
         location="Kochi",
