@@ -5,6 +5,7 @@ from datetime import datetime
 from agents.common.agent_contract import AgentRequest, AgentResponse
 from agents.ocean.safety import assess_marine_safety
 from agents.ocean.recommendation import get_pfz_recommendation
+from agents.ocean.models.evidence import Evidence
 
 
 REQUIRED_FIELDS = [
@@ -93,6 +94,30 @@ def get_parameter_value(
     return None
 
 
+def get_evidence(
+    marine_data: list[dict],
+) -> dict:
+    """
+    Build evidence and provenance information
+    for each marine observation.
+    """
+    evidence_data = {}
+
+    for observation in marine_data:
+        evidence = Evidence(
+            parameter=observation["parameter"],
+            source=observation["source"],
+            timestamp=observation["timestamp"],
+            confidence=observation["confidence"],
+        )
+
+        evidence_data[
+            observation["parameter"]
+        ] = evidence.to_dict()
+
+    return evidence_data
+
+
 def handle_ocean(request: AgentRequest) -> AgentResponse:
     """
     M2 Ocean Agent entry point.
@@ -135,6 +160,8 @@ def handle_ocean(request: AgentRequest) -> AgentResponse:
             pfz_data
         )
 
+        evidence = get_evidence(marine_data)
+
         data = {
             "sst": get_parameter_value(
                 marine_data,
@@ -153,6 +180,7 @@ def handle_ocean(request: AgentRequest) -> AgentResponse:
             "marine_safety": marine_safety,
             "pfz": pfz_data,
             "pfz_recommendation": pfz_recommendation,
+            "evidence": evidence,
         }
 
         confidence_values = [
