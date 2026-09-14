@@ -1,6 +1,9 @@
 import { decisionState } from "./models/decisionState";
 import { candidates } from "./data/mockDecision";
 import MarineMap from "./components/map/MarineMap";
+import EvidencePanel from "./components/evidence/EvidencePanel";
+import WhatIfPanel from "./components/whatif/WhatIfPanel";
+import UncertaintyPanel from "./components/decision/UncertaintyPanel";
 
 function App() {
   const recommended = decisionState.recommendedCandidate;
@@ -21,10 +24,14 @@ function App() {
 
       <main className="dashboard">
 
+        {/* USER OBJECTIVE */}
+
         <section className="objective">
           <span>USER OBJECTIVE</span>
 
-          <h2>{decisionState.objective.text}</h2>
+          <h2>
+            {decisionState.objective.text}
+          </h2>
 
           <p>
             Vessel: {decisionState.objective.vessel} ·{" "}
@@ -32,15 +39,21 @@ function App() {
           </p>
         </section>
 
+
+        {/* MAP + DECISION */}
+
         <section className="content-grid">
 
-          {/* REAL LEAFLET MAP */}
+          {/* MARINE MAP */}
 
           <div className="map-panel">
 
             <div className="panel-title">
               <span>MARINE MAP</span>
-              <span>{candidates.length} CANDIDATES</span>
+
+              <span>
+                {candidates.length} CANDIDATES
+              </span>
             </div>
 
             <MarineMap candidates={candidates} />
@@ -53,19 +66,27 @@ function App() {
           <div className="decision-panel">
 
             <div className="panel-title">
-              <span>DECISION</span>
+
+              <span>
+                DECISION
+              </span>
 
               <span className="confidence">
                 {recommended.confidence}
               </span>
+
             </div>
 
 
             <div className="recommendation">
 
-              <span>RECOMMENDED</span>
+              <span>
+                RECOMMENDED
+              </span>
 
-              <h2>{recommended.name}</h2>
+              <h2>
+                {recommended.name}
+              </h2>
 
               <p>
                 {decisionState.decisionSummary}
@@ -74,40 +95,63 @@ function App() {
             </div>
 
 
+            {/* DECISION METRICS */}
+
             <div className="metrics">
 
               <div>
                 <span>SAFETY</span>
-                <strong>{recommended.safety}%</strong>
+
+                <strong>
+                  {recommended.safety}%
+                </strong>
               </div>
+
 
               <div>
                 <span>OPPORTUNITY</span>
-                <strong>{recommended.opportunity}%</strong>
+
+                <strong>
+                  {recommended.opportunity}%
+                </strong>
               </div>
+
 
               <div>
                 <span>UNCERTAINTY</span>
-                <strong>{recommended.uncertainty}%</strong>
+
+                <strong>
+                  {recommended.uncertainty}%
+                </strong>
               </div>
+
 
               <div>
                 <span>DISTANCE</span>
-                <strong>{recommended.distance} km</strong>
+
+                <strong>
+                  {recommended.distance} km
+                </strong>
               </div>
 
             </div>
 
 
+            {/* WHY */}
+
             <div className="why">
 
-              <h3>WHY?</h3>
+              <h3>
+                WHY?
+              </h3>
 
-              {decisionState.tradeoffs.map((tradeoff) => (
-                <p key={tradeoff}>
-                  ✓ {tradeoff}
-                </p>
-              ))}
+              {decisionState.tradeoffs.map(
+                (tradeoff) => (
+                  <p key={tradeoff}>
+                    ✓ {tradeoff}
+                  </p>
+                )
+              )}
 
             </div>
 
@@ -122,7 +166,9 @@ function App() {
 
           <div className="section-heading">
 
-            <h2>Candidates</h2>
+            <h2>
+              Candidates
+            </h2>
 
             <span>
               DECISION FRONTIER
@@ -133,62 +179,104 @@ function App() {
 
           <div className="candidate-grid">
 
-            {candidates.map((candidate) => (
+            {candidates.map(
+              (candidate) => (
 
-              <div
-                key={candidate.id}
-                className={`candidate-card ${candidate.status.toLowerCase()}`}
-              >
+                <div
+                  key={candidate.id}
+                  className={`candidate-card ${candidate.status.toLowerCase()}`}
+                >
 
-                <div className="candidate-header">
+                  <div className="candidate-header">
 
-                  <h3>
-                    {candidate.name}
-                  </h3>
+                    <h3>
+                      {candidate.name}
+                    </h3>
 
-                  <span>
-                    {candidate.status}
-                  </span>
+                    <span>
+                      {candidate.status}
+                    </span>
+
+                  </div>
+
+
+                  <div className="candidate-stats">
+
+                    <div>
+                      <small>
+                        Safety
+                      </small>
+
+                      <strong>
+                        {candidate.safety}%
+                      </strong>
+                    </div>
+
+
+                    <div>
+                      <small>
+                        Opportunity
+                      </small>
+
+                      <strong>
+                        {candidate.opportunity}%
+                      </strong>
+                    </div>
+
+
+                    <div>
+                      <small>
+                        Uncertainty
+                      </small>
+
+                      <strong>
+                        {candidate.uncertainty}%
+                      </strong>
+                    </div>
+
+
+                    <div>
+                      <small>
+                        Distance
+                      </small>
+
+                      <strong>
+                        {candidate.distance} km
+                      </strong>
+                    </div>
+
+                  </div>
+
+
+                  <p className="candidate-reason">
+                    {candidate.reason}
+                  </p>
 
                 </div>
 
-
-                <div className="candidate-stats">
-
-                  <div>
-                    <small>Safety</small>
-                    <strong>{candidate.safety}%</strong>
-                  </div>
-
-                  <div>
-                    <small>Opportunity</small>
-                    <strong>{candidate.opportunity}%</strong>
-                  </div>
-
-                  <div>
-                    <small>Uncertainty</small>
-                    <strong>{candidate.uncertainty}%</strong>
-                  </div>
-
-                  <div>
-                    <small>Distance</small>
-                    <strong>{candidate.distance} km</strong>
-                  </div>
-
-                </div>
-
-
-                <p className="candidate-reason">
-                  {candidate.reason}
-                </p>
-
-              </div>
-
-            ))}
+              )
+            )}
 
           </div>
 
         </section>
+
+
+        {/* EVIDENCE */}
+
+        <EvidencePanel
+          candidate={recommended}
+        />
+
+
+        {/* UNCERTAINTY */}
+
+        <UncertaintyPanel />
+
+
+        {/* WHAT-IF */}
+
+        <WhatIfPanel />
 
       </main>
 

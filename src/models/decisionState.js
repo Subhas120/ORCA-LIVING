@@ -2,7 +2,7 @@ export const decisionState = {
   objective: {
     text: "Find the safest useful fishing opportunity tomorrow morning",
     vessel: "Small vessel",
-    time: "Tomorrow morning"
+    time: "Tomorrow morning",
   },
 
   recommendedCandidate: {
@@ -13,7 +13,7 @@ export const decisionState = {
     opportunity: 87,
     uncertainty: 18,
     distance: 12,
-    confidence: "HIGH"
+    confidence: "HIGH",
   },
 
   alternativeCandidates: [
@@ -25,8 +25,8 @@ export const decisionState = {
       opportunity: 91,
       uncertainty: 31,
       distance: 24,
-      confidence: "MEDIUM"
-    }
+      confidence: "MEDIUM",
+    },
   ],
 
   rejectedCandidates: [
@@ -38,8 +38,8 @@ export const decisionState = {
       safety: 38,
       opportunity: 90,
       uncertainty: 22,
-      distance: 18
-    }
+      distance: 18,
+    },
   ],
 
   decisionSummary:
@@ -49,13 +49,13 @@ export const decisionState = {
     "Strong safety margin",
     "High opportunity indicators",
     "Shorter travel distance",
-    "Low uncertainty"
+    "Low uncertainty",
   ],
 
   uncertainty: {
-    level: "HIGH",
+    level: "LOW",
     score: 18,
-    explanation: "Evidence is consistent and recent."
+    explanation: "Evidence is consistent and recent.",
   },
 
   evidence: [
@@ -64,15 +64,15 @@ export const decisionState = {
       category: "Safety",
       observation: "Wave height = 1.6 m",
       source: "Ocean forecast",
-      timestamp: "2026-09-11 06:00"
+      timestamp: "2026-09-11 06:00",
     },
     {
       id: "E2",
       category: "Opportunity",
       observation: "Favorable chlorophyll conditions",
       source: "Satellite observation",
-      timestamp: "2026-09-11 05:30"
-    }
+      timestamp: "2026-09-11 05:30",
+    },
   ],
 
   sensitivity: {
@@ -80,8 +80,8 @@ export const decisionState = {
     current: "15 kt",
     threshold: "22 kt",
     explanation:
-      "If wind increases significantly, Candidate A may fall below the safety threshold."
+      "If wind increases significantly, Candidate A may fall below the safety threshold.",
   },
 
-  dataMode: "SIMULATED"
+  dataMode: "SIMULATED",
 };
