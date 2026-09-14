@@ -8,8 +8,7 @@ Ownership boundaries:
     M3 -> frontend/GIS presentation
     M4 -> request normalization, orchestration and response adaptation
 
-Both REST and voice MUST use this service so that there is exactly one
-M4 decision path and both interfaces receive identical decision semantics.
+REST and voice use this same service so there is exactly one M4 decision path.
 """
 
 from __future__ import annotations
@@ -39,7 +38,6 @@ class DecisionService:
 
     @staticmethod
     def _objective(request: DecisionRequest) -> dict[str, str | None]:
-        """Build the transport-level representation of the user request."""
         return {
             "text": request.query,
             "vessel": request.vessel_type,
@@ -47,14 +45,9 @@ class DecisionService:
         }
 
     @staticmethod
-    def _marine_safety(
-        safety_evals,
-    ) -> tuple[str | None, list[str]]:
-        """Extract M2 safety metadata without recalculating safety."""
-        statuses = {
-            evaluation.status
-            for evaluation in safety_evals
-        }
+    def _marine_safety(safety_evals) -> tuple[str | None, list[str]]:
+        """Read M2 safety metadata without recalculating marine safety."""
+        statuses = {evaluation.status for evaluation in safety_evals}
 
         if "UNSAFE" in statuses:
             status = "UNSAFE"
@@ -74,59 +67,83 @@ class DecisionService:
         )
         return status, reasons
 
-    def run(self, request: DecisionRequest) -> DecisionResponse:
-        """Run the complete M4 -> M2 -> M1 -> M4 decision flow.
+    @staticmethod
+    def _failure(
+        status: StatusEnum,
+        objective: dict[str, str | None],
+        summary: str,
+        *,
+        safety_status: str | None = None,
+        safety_reasons: list[str] | None = None,
+    ) -> DecisionResponse:
+        """Create a fail-closed response with no recommendation."""
+        return DecisionResponse(
+            status=status,
+            objective=objective,
+            decisionSummary=summary,
+            marineSafetyStatus=safety_status,
+            marineSafetyReasons=safety_reasons or [],
+        )
 
-        Failure behavior is fail-closed: an upstream failure never creates
-        a recommendation. M2 safety remains authoritative throughout.
-        """
+    def run(self, request: DecisionRequest) -> DecisionResponse:
+        """Run M4 -> M2 -> M1 -> M4 with fail-closed safety semantics."""
         objective = self._objective(request)
 
-        # -------------------------------------------------------------
-        # 1. M2: marine state + authoritative marine safety
-        # -------------------------------------------------------------
         try:
             world_state, proposals, safety_evals = (
                 self.m2_adapter.get_marine_state_and_safety(request)
             )
         except InsufficientEvidenceError as exc:
-            return DecisionResponse(
-                status=StatusEnum.INSUFFICIENT_EVIDENCE,
-                objective=objective,
-                decisionSummary=str(exc),
-                marineSafetyStatus="INSUFFICIENT_EVIDENCE",
-                marineSafetyReasons=[str(exc)],
+            return self._failure(
+                StatusEnum.INSUFFICIENT_EVIDENCE,
+                objective,
+                str(exc),
+                safety_status="INSUFFICIENT_EVIDENCE",
+                safety_reasons=[str(exc)],
             )
         except M2AdapterError as exc:
-            return DecisionResponse(
-                status=StatusEnum.SERVICE_UNAVAILABLE,
-                objective=objective,
-                decisionSummary=str(exc),
+            return self._failure(
+                StatusEnum.SERVICE_UNAVAILABLE,
+                objective,
+                str(exc),
+            )
+        except Exception as exc:
+            # Unexpected M2 failure is also fail-closed.
+            return self._failure(
+                StatusEnum.SERVICE_UNAVAILABLE,
+                objective,
+                f"M2 integration failed: {exc}",
             )
 
-        marine_safety_status, marine_safety_reasons = (
-            self._marine_safety(safety_evals)
+        marine_safety_status, marine_safety_reasons = self._marine_safety(
+            safety_evals
         )
 
-        # M2 itself reports insufficient evidence through safety metadata.
-        # Do not send that state through a normal decision path where it could
-        # be misrepresented as a safe recommendation.
+        # Missing/invalid safety metadata must never be treated as SAFE.
+        if marine_safety_status is None:
+            return self._failure(
+                StatusEnum.INSUFFICIENT_EVIDENCE,
+                objective,
+                "M2 did not provide a valid authoritative marine-safety status",
+                safety_status="INSUFFICIENT_EVIDENCE",
+                safety_reasons=[
+                    "Authoritative marine-safety status is unavailable"
+                ],
+            )
+
         if marine_safety_status == "INSUFFICIENT_EVIDENCE":
-            return DecisionResponse(
-                status=StatusEnum.INSUFFICIENT_EVIDENCE,
-                objective=objective,
-                decisionSummary=(
+            return self._failure(
+                StatusEnum.INSUFFICIENT_EVIDENCE,
+                objective,
+                (
                     marine_safety_reasons[0]
                     if marine_safety_reasons
                     else "M2 reports insufficient evidence"
                 ),
-                marineSafetyStatus=marine_safety_status,
-                marineSafetyReasons=marine_safety_reasons,
+                safety_status=marine_safety_status,
+                safety_reasons=marine_safety_reasons,
             )
 
-        # -------------------------------------------------------------
-        # 2. M1: authoritative decision intelligence
-        # -------------------------------------------------------------
         try:
             decision_intel = self.m1_service.run_decision_pipeline(
                 world_state,
@@ -135,49 +152,35 @@ class DecisionService:
                 request,
             )
         except Exception as exc:
-            # Fail closed. REST and voice intentionally share this behavior.
-            return DecisionResponse(
-                status=StatusEnum.SERVICE_UNAVAILABLE,
-                objective=objective,
-                decisionSummary=f"M1 pipeline failed: {exc}",
-                marineSafetyStatus=marine_safety_status,
-                marineSafetyReasons=marine_safety_reasons,
+            return self._failure(
+                StatusEnum.SERVICE_UNAVAILABLE,
+                objective,
+                f"M1 pipeline failed: {exc}",
+                safety_status=marine_safety_status,
+                safety_reasons=marine_safety_reasons,
             )
 
-        # -------------------------------------------------------------
-        # 3. Safety contract invariant
-        # -------------------------------------------------------------
-        # M1 owns safety filtering/decision logic. If it nevertheless returns
-        # a recommendation while M2 says the marine state is UNSAFE, M4 must
-        # fail closed rather than expose that candidate to M3 or voice.
-        if (
-            marine_safety_status == "UNSAFE"
-            and decision_intel.recommended_candidate_id
-        ):
-            return DecisionResponse(
-                status=StatusEnum.SERVICE_UNAVAILABLE,
-                objective=objective,
-                decisionSummary=(
-                    "M1 returned a recommendation despite an authoritative "
-                    "M2 UNSAFE marine-safety result"
-                ),
-                marineSafetyStatus="UNSAFE",
-                marineSafetyReasons=marine_safety_reasons,
-            )
-
-        # -------------------------------------------------------------
-        # 4. Public status mapping
-        # -------------------------------------------------------------
+        # M1 owns the decision. M4 only enforces the cross-layer safety
+        # invariant: an M2 UNSAFE result can never expose a recommendation.
         if marine_safety_status == "UNSAFE":
+            if decision_intel.recommended_candidate_id:
+                return self._failure(
+                    StatusEnum.SERVICE_UNAVAILABLE,
+                    objective,
+                    (
+                        "M1 returned a recommendation despite an authoritative "
+                        "M2 UNSAFE marine-safety result"
+                    ),
+                    safety_status="UNSAFE",
+                    safety_reasons=marine_safety_reasons,
+                )
+
             status = StatusEnum.NO_SAFE_CANDIDATES
         elif not decision_intel.recommended_candidate_id:
             status = StatusEnum.NO_SAFE_CANDIDATES
         else:
             status = StatusEnum.DECISION_AVAILABLE
 
-        # -------------------------------------------------------------
-        # 5. M4: structural response adaptation only
-        # -------------------------------------------------------------
         return ResponseAdapter.adapt(
             decision_intel,
             status,
@@ -188,6 +191,5 @@ class DecisionService:
         )
 
 
-# One process-wide service keeps REST and voice on the same orchestration
-# implementation while remaining easy to replace in tests.
+# Shared singleton used by REST and voice.
 decision_service = DecisionService()
