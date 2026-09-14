@@ -17,6 +17,15 @@ function UncertaintyPanel({
     );
 
 
+  const explanation =
+    uncertainty.reason ??
+    (
+      score !== null
+        ? "Uncertainty score is derived from the backend confidence value."
+        : "Uncertainty information is not currently available."
+    );
+
+
   return (
     <section className="uncertainty-panel">
 
@@ -76,8 +85,7 @@ function UncertaintyPanel({
           </h3>
 
           <p>
-            {uncertainty.reason ??
-              "Uncertainty information is not currently available from the backend."}
+            {explanation}
           </p>
 
         </div>

@@ -89,6 +89,33 @@ function App() {
       : demoDecisionState.recommendedCandidate;
 
 
+  /*
+   * M2 provides the authoritative overall confidence.
+   *
+   * If the adapter already provides an uncertainty
+   * score, use it.
+   *
+   * Otherwise derive the display value from the
+   * backend confidence:
+   *
+   * confidence 85%
+   * →
+   * uncertainty 15%
+   */
+  const uncertaintyScore =
+    usingM2
+      ? (
+        currentDecision.uncertainty?.score !== null &&
+        currentDecision.uncertainty?.score !== undefined
+          ? currentDecision.uncertainty.score
+          : currentDecision.confidence !== null &&
+            currentDecision.confidence !== undefined
+            ? 100 - currentDecision.confidence
+            : null
+      )
+      : recommended?.uncertainty ?? null;
+
+
   return (
     <div className="app">
 
@@ -358,12 +385,10 @@ function App() {
 
                 <strong>
 
-                  {usingM2
-                    ? (
-                      currentDecision.uncertainty
-                        .level ?? "—"
-                    )
-                    : `${recommended.uncertainty}%`}
+                  {uncertaintyScore !== null &&
+                  uncertaintyScore !== undefined
+                    ? `${uncertaintyScore}%`
+                    : "—"}
 
                 </strong>
 
@@ -593,6 +618,7 @@ function App() {
 
 
         <EvidencePanel
+
           candidate={recommended}
 
           evidence={
@@ -606,15 +632,21 @@ function App() {
               ? "M2 BACKEND"
               : demoDecisionState.dataMode
           }
+
         />
 
 
         <UncertaintyPanel
+
           uncertainty={
             usingM2
-              ? currentDecision.uncertainty
-              : demoDecisionState.uncertainty
+              ? {
+                ...currentDecision.uncertainty,
+                score: uncertaintyScore,
+              }
+              : currentDecision.uncertainty
           }
+
         />
 
 
