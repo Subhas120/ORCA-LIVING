@@ -145,11 +145,30 @@ class DecisionService:
             )
 
         # -------------------------------------------------------------
-        # 3. Public status mapping
+        # 3. Safety contract invariant
+        # -------------------------------------------------------------
+        # M1 owns safety filtering/decision logic. If it nevertheless returns
+        # a recommendation while M2 says the marine state is UNSAFE, M4 must
+        # fail closed rather than expose that candidate to M3 or voice.
+        if (
+            marine_safety_status == "UNSAFE"
+            and decision_intel.recommended_candidate_id
+        ):
+            return DecisionResponse(
+                status=StatusEnum.SERVICE_UNAVAILABLE,
+                objective=objective,
+                decisionSummary=(
+                    "M1 returned a recommendation despite an authoritative "
+                    "M2 UNSAFE marine-safety result"
+                ),
+                marineSafetyStatus="UNSAFE",
+                marineSafetyReasons=marine_safety_reasons,
+            )
+
+        # -------------------------------------------------------------
+        # 4. Public status mapping
         # -------------------------------------------------------------
         if marine_safety_status == "UNSAFE":
-            # M1 should have filtered unsafe candidates through its Safety
-            # Firewall. M4 does not manufacture or rewrite a recommendation.
             status = StatusEnum.NO_SAFE_CANDIDATES
         elif not decision_intel.recommended_candidate_id:
             status = StatusEnum.NO_SAFE_CANDIDATES
@@ -157,7 +176,7 @@ class DecisionService:
             status = StatusEnum.DECISION_AVAILABLE
 
         # -------------------------------------------------------------
-        # 4. M4: structural response adaptation only
+        # 5. M4: structural response adaptation only
         # -------------------------------------------------------------
         return ResponseAdapter.adapt(
             decision_intel,
