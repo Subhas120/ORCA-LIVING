@@ -89,19 +89,6 @@ function App() {
       : demoDecisionState.recommendedCandidate;
 
 
-  /*
-   * M2 provides the authoritative overall confidence.
-   *
-   * If the adapter already provides an uncertainty
-   * score, use it.
-   *
-   * Otherwise derive the display value from the
-   * backend confidence:
-   *
-   * confidence 85%
-   * →
-   * uncertainty 15%
-   */
   const uncertaintyScore =
     usingM2
       ? (
@@ -136,10 +123,10 @@ function App() {
 
         <div className="data-mode">
 
-          ◉{" "}
+          ●{" "}
 
           {usingM2
-            ? "M2 BACKEND"
+            ? "M2 BACKEND CONNECTED"
             : "SIMULATED DEMO"}
 
         </div>
@@ -185,7 +172,8 @@ function App() {
 
 
         {!usingM2 &&
-          !loading && (
+          !loading &&
+          !error && (
 
             <section className="integration-status demo">
 
@@ -194,9 +182,27 @@ function App() {
               </strong>
 
               <span>
-                {" "}
                 M2 HTTP endpoint is not configured.
-                {" "}
+                The dashboard is displaying clearly
+                labelled simulated demonstration data.
+              </span>
+
+            </section>
+
+          )}
+
+
+        {error &&
+          !loading && (
+
+            <section className="integration-status demo">
+
+              <strong>
+                SIMULATED FALLBACK
+              </strong>
+
+              <span>
+                The M2 backend could not be reached.
                 The dashboard is displaying clearly
                 labelled simulated demonstration data.
               </span>

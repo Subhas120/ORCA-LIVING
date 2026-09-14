@@ -319,10 +319,42 @@ input {
 }
 
 .candidate-card {
+  display: block;
+  width: 100%;
   padding: 18px;
+
   border: 1px solid #223b4d;
   border-radius: 9px;
+
   background: #0f1e2b;
+  color: #e8f1f7;
+
+  font: inherit;
+  text-align: left;
+
+  cursor: pointer;
+
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    transform 0.15s ease;
+}
+
+.candidate-card:hover {
+  border-color: #3a586d;
+  background: #122331;
+  transform: translateY(-1px);
+}
+
+.candidate-card:focus-visible {
+  outline: 2px solid #63dba4;
+  outline-offset: 2px;
+}
+
+.candidate-card.selected {
+  border-color: #63dba4;
+  background: #122a2a;
+  box-shadow: 0 0 0 1px rgba(99, 219, 164, 0.25);
 }
 
 .candidate-card.recommended {
@@ -336,6 +368,11 @@ input {
 .candidate-card.rejected {
   border-color: #67373a;
   background: #151519;
+}
+
+.candidate-card.rejected.selected {
+  border-color: #e56b6f;
+  box-shadow: 0 0 0 1px rgba(229, 107, 111, 0.25);
 }
 
 .candidate-header {
@@ -690,6 +727,7 @@ input {
     height: 400px;
   }
 }
+
 /* =========================
    UNCERTAINTY PANEL
 ========================= */
@@ -814,6 +852,7 @@ input {
 
   line-height: 1.5;
 }
+
 /* ================================
    MARINE CONDITIONS - UNAVAILABLE
 ================================ */
