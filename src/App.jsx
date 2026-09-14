@@ -18,15 +18,6 @@ function App() {
   const [error, setError] = useState(null);
 
 
-  /*
-   * M2 integration
-   *
-   * The frontend only attempts to call the backend
-   * when a real endpoint has been configured.
-   *
-   * Until then, the dashboard remains clearly
-   * labelled as SIMULATED DEMO.
-   */
   useEffect(() => {
     const endpoint =
       import.meta.env.VITE_ORCA_OCEAN_ENDPOINT;
@@ -57,6 +48,7 @@ function App() {
         });
 
         setDecision(result);
+
       } catch (err) {
         console.error(err);
 
@@ -64,20 +56,19 @@ function App() {
           err.message ||
           "Unable to load ORCA decision."
         );
+
       } finally {
         setLoading(false);
       }
     }
 
     loadDecision();
+
   }, []);
 
 
-  /*
-   * Determine whether the dashboard is currently
-   * displaying a normalized M2 response.
-   */
-  const usingM2 = decision !== null;
+  const usingM2 =
+    decision !== null;
 
 
   const currentDecision =
@@ -101,11 +92,10 @@ function App() {
   return (
     <div className="app">
 
-      {/* HEADER */}
-
       <header className="header">
 
         <div>
+
           <h1>
             ORCA-LIVING
           </h1>
@@ -113,6 +103,7 @@ function App() {
           <p>
             Marine Decision Intelligence
           </p>
+
         </div>
 
 
@@ -131,8 +122,6 @@ function App() {
 
       <main className="dashboard">
 
-
-        {/* BACKEND STATUS */}
 
         {loading && (
 
@@ -190,8 +179,6 @@ function App() {
           )}
 
 
-        {/* USER OBJECTIVE */}
-
         <section className="objective">
 
           <span>
@@ -212,12 +199,8 @@ function App() {
         </section>
 
 
-        {/* MAP + DECISION */}
-
         <section className="content-grid">
 
-
-          {/* MARINE MAP */}
 
           <div className="map-panel">
 
@@ -243,8 +226,6 @@ function App() {
 
           </div>
 
-
-          {/* DECISION PANEL */}
 
           <div className="decision-panel">
 
@@ -295,8 +276,6 @@ function App() {
             </div>
 
 
-            {/* M2 MARINE SAFETY */}
-
             {usingM2 && (
 
               <div className="marine-safety">
@@ -312,9 +291,11 @@ function App() {
                 {currentDecision.marineSafety
                   .reasons?.map(
                     (reason) => (
+
                       <p key={reason}>
                         {reason}
                       </p>
+
                     )
                   )}
 
@@ -322,8 +303,6 @@ function App() {
 
             )}
 
-
-            {/* DECISION METRICS */}
 
             <div className="metrics">
 
@@ -411,8 +390,6 @@ function App() {
             </div>
 
 
-            {/* WHY */}
-
             <div className="why">
 
               <h3>
@@ -460,18 +437,20 @@ function App() {
         </section>
 
 
-        {/* MARINE CONDITIONS */}
-
         <MarineConditions
           conditions={
             usingM2
               ? currentDecision.marineConditions
               : demoDecisionState.marineConditions
           }
+
+          safety={
+            usingM2
+              ? currentDecision.marineSafety
+              : null
+          }
         />
 
-
-        {/* CANDIDATES / PFZ */}
 
         <section className="candidates">
 
@@ -613,8 +592,6 @@ function App() {
         </section>
 
 
-        {/* EVIDENCE */}
-
         <EvidencePanel
           candidate={recommended}
 
@@ -626,16 +603,11 @@ function App() {
 
           dataMode={
             usingM2
-              ? (
-                currentDecision.source ??
-                "M2 BACKEND"
-              )
+              ? "M2 BACKEND"
               : demoDecisionState.dataMode
           }
         />
 
-
-        {/* UNCERTAINTY */}
 
         <UncertaintyPanel
           uncertainty={
@@ -645,8 +617,6 @@ function App() {
           }
         />
 
-
-        {/* WHAT-IF */}
 
         <WhatIfPanel />
 

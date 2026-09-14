@@ -1,17 +1,33 @@
+import "./MarineConditions.css";
+
+
 function MarineConditions({
   conditions,
+  safety,
 }) {
-  const safety =
-    conditions?.safety || {};
-
   const hasConditions =
     conditions &&
     (
-      conditions.sst !== undefined ||
-      conditions.chlorophyll !== undefined ||
-      conditions.waveHeight !== undefined ||
-      conditions.wavePeriod !== undefined ||
-      conditions.currentSpeed !== undefined
+      (
+        conditions.sst !== null &&
+        conditions.sst !== undefined
+      ) ||
+      (
+        conditions.chlorophyll !== null &&
+        conditions.chlorophyll !== undefined
+      ) ||
+      (
+        conditions.waveHeight !== null &&
+        conditions.waveHeight !== undefined
+      ) ||
+      (
+        conditions.wavePeriod !== null &&
+        conditions.wavePeriod !== undefined
+      ) ||
+      (
+        conditions.currentSpeed !== null &&
+        conditions.currentSpeed !== undefined
+      )
     );
 
 
@@ -25,7 +41,7 @@ function MarineConditions({
         </span>
 
         <span>
-          {safety.status || "UNAVAILABLE"}
+          {safety?.status || "UNAVAILABLE"}
         </span>
 
       </div>
@@ -114,7 +130,7 @@ function MarineConditions({
           </div>
 
 
-          {safety.reasons?.length > 0 && (
+          {safety?.reasons?.length > 0 && (
 
             <div className="safety-reasons">
 
@@ -143,5 +159,6 @@ function MarineConditions({
     </section>
   );
 }
+
 
 export default MarineConditions;
