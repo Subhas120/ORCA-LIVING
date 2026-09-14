@@ -13,15 +13,20 @@ function formatConfidence(confidence) {
   return confidence;
 }
 
-
 function EvidencePanel({
   candidate,
   evidence = [],
-  dataMode = "SIMULATED",
+  dataMode = "UNKNOWN",
 }) {
-  const isBackendConnected =
-    dataMode === "BACKEND CONNECTED";
+  const normalizedDataMode =
+    typeof dataMode === "string"
+      ? dataMode.trim().toUpperCase()
+      : "UNKNOWN";
 
+  const isDemonstrationData =
+    normalizedDataMode === "SIMULATED" ||
+    normalizedDataMode === "DEMO" ||
+    normalizedDataMode === "DEMONSTRATION";
 
   const hasSampleSource =
     evidence.some(
@@ -32,27 +37,18 @@ function EvidencePanel({
           .includes("sample")
     );
 
-
   return (
     <section className="evidence-panel">
-
       <div className="panel-title">
-
-        <span>
-          EVIDENCE
-        </span>
+        <span>EVIDENCE</span>
 
         <span>
           DECISION SUPPORT
         </span>
-
       </div>
 
-
       <div className="evidence-summary">
-
         <div>
-
           <h2>
             Why this location?
           </h2>
@@ -62,18 +58,12 @@ function EvidencePanel({
             environmental observations and their
             associated provenance.
           </p>
-
         </div>
-
       </div>
 
-
       <div className="evidence-list">
-
         {evidence.length > 0 ? (
-
           evidence.map((item, index) => (
-
             <div
               className="evidence-item"
               key={
@@ -82,15 +72,12 @@ function EvidencePanel({
                 `evidence-${index}`
               }
             >
-
               <div className="evidence-main">
-
                 <div className="evidence-category">
                   {item.parameter ??
                     item.category ??
                     "Marine observation"}
                 </div>
-
 
                 <strong>
                   {item.observation ??
@@ -99,13 +86,11 @@ function EvidencePanel({
                     "Observation available"}
                 </strong>
 
-
                 <span>
                   Source:{" "}
                   {item.source ??
                     "Unknown source"}
                 </span>
-
 
                 <span>
                   Observed:{" "}
@@ -113,38 +98,27 @@ function EvidencePanel({
                     "Timestamp unavailable"}
                 </span>
 
-
                 {item.confidence !== null &&
                   item.confidence !== undefined && (
-
                     <span>
                       Evidence confidence:{" "}
                       {formatConfidence(
                         item.confidence
                       )}
                     </span>
-
                   )}
-
               </div>
-
 
               <div className="evidence-id">
                 {item.id ??
                   item.parameter ??
                   `E${index + 1}`}
               </div>
-
             </div>
-
           ))
-
         ) : (
-
           <div className="evidence-item">
-
             <div className="evidence-main">
-
               <div className="evidence-category">
                 EVIDENCE UNAVAILABLE
               </div>
@@ -158,23 +132,14 @@ function EvidencePanel({
                 The backend has not supplied evidence
                 for this decision.
               </span>
-
             </div>
-
           </div>
-
         )}
-
       </div>
 
-
       <div className="evidence-signals">
-
         <div>
-
-          <span>
-            DISTANCE
-          </span>
+          <span>DISTANCE</span>
 
           <strong>
             {candidate?.distance !== null &&
@@ -182,47 +147,31 @@ function EvidencePanel({
               ? `${candidate.distance} km`
               : "—"}
           </strong>
-
         </div>
 
-
         <div>
-
-          <span>
-            OPPORTUNITY
-          </span>
+          <span>OPPORTUNITY</span>
 
           <strong>
-            {candidate?.opportunityStatus ??
-              (candidate?.opportunity !== null &&
-              candidate?.opportunity !== undefined
-                ? `${candidate.opportunity}%`
-                : "—")}
+            {candidate?.opportunity !== null &&
+            candidate?.opportunity !== undefined
+              ? `${candidate.opportunity}%`
+              : "—"}
           </strong>
-
         </div>
 
-
         <div>
-
-          <span>
-            CONFIDENCE
-          </span>
+          <span>CONFIDENCE</span>
 
           <strong>
             {formatConfidence(
               candidate?.confidence
             )}
           </strong>
-
         </div>
 
-
         <div>
-
-          <span>
-            LOCATION
-          </span>
+          <span>LOCATION</span>
 
           <strong>
             {candidate?.lat !== undefined &&
@@ -234,45 +183,28 @@ function EvidencePanel({
                 )}°`
               : "—"}
           </strong>
-
         </div>
-
       </div>
 
-
       <div className="evidence-footer">
-
         <div>
-
-          <span>
-            DATA MODE
-          </span>
+          <span>DATA MODE</span>
 
           <strong>
             {dataMode}
           </strong>
-
         </div>
 
-
         <div>
-
-          <span>
-            PROVENANCE
-          </span>
+          <span>PROVENANCE</span>
 
           <strong>
             SOURCE + TIMESTAMP
           </strong>
-
         </div>
-
       </div>
 
-
-      {isBackendConnected &&
-        hasSampleSource && (
-
+      {(isDemonstrationData || hasSampleSource) && (
         <div
           style={{
             marginTop: "16px",
@@ -285,7 +217,6 @@ function EvidencePanel({
             gap: "5px",
           }}
         >
-
           <strong
             style={{
               fontSize: "11px",
@@ -302,19 +233,14 @@ function EvidencePanel({
               color: "#aab8c3",
             }}
           >
-            The M2 backend is connected, but the
-            supplied marine and PFZ observations are
-            identified as sample/prototype data.
-            They are not presented as live observations.
+            The supplied decision data is identified
+            as demonstration/prototype data. It is
+            not presented as live observations.
           </span>
-
         </div>
-
       )}
-
     </section>
   );
 }
-
 
 export default EvidencePanel;

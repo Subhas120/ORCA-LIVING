@@ -1,16 +1,19 @@
 /*
  * ORCA M3 API SERVICE
  *
- * Frontend HTTP boundary for the M2 Ocean API.
+ * Frontend HTTP boundary for the final M4 Decision API.
+ *
+ * M4 /api/v1/decision is the integration boundary
+ * for the M1 + M2 decision pipeline.
  *
  * M3 does not calculate marine safety, ranking,
  * optimization, or scientific suitability here.
  *
  * This service only:
- *   1. Sends an AgentRequest to the backend.
+ *   1. Sends an AgentRequest to M4.
  *   2. Enforces a frontend request timeout.
- *   3. Validates the basic HTTP/JSON response shape.
- *   4. Returns the backend response to the M2 adapter.
+ *   3. Validates the HTTP/JSON response.
+ *   4. Returns the backend response to the adapter.
  */
 
 const DEFAULT_TIMEOUT_MS = 10000;
@@ -18,11 +21,11 @@ const DEFAULT_TIMEOUT_MS = 10000;
 
 function getEndpoint() {
   const endpoint =
-    import.meta.env.VITE_ORCA_OCEAN_ENDPOINT;
+    import.meta.env.VITE_ORCA_DECISION_ENDPOINT;
 
   if (!endpoint) {
     throw new Error(
-      "ORCA backend endpoint is not configured."
+      "ORCA M4 decision endpoint is not configured. Set VITE_ORCA_DECISION_ENDPOINT."
     );
   }
 
@@ -50,23 +53,11 @@ function validateResponseShape(
     );
   }
 
-  if (
-    response.data !== undefined &&
-    (
-      response.data === null ||
-      typeof response.data !== "object"
-    )
-  ) {
-    throw new Error(
-      "Backend response data is malformed."
-    );
-  }
-
   return response;
 }
 
 
-export async function requestOceanData(
+export async function requestDecision(
   request
 ) {
   const endpoint =
@@ -125,12 +116,15 @@ export async function requestOceanData(
 
     if (!response.ok) {
       const backendMessage =
+        payload?.detail ??
         payload?.error ??
         payload?.message ??
         `Backend request failed with HTTP ${response.status}.`;
 
       throw new Error(
-        backendMessage
+        typeof backendMessage === "string"
+          ? backendMessage
+          : `Backend request failed with HTTP ${response.status}.`
       );
     }
 
@@ -146,7 +140,7 @@ export async function requestOceanData(
       "AbortError"
     ) {
       throw new Error(
-        "ORCA backend request timed out after 10 seconds.",
+        "ORCA M4 decision backend request timed out after 10 seconds.",
         {
           cause: error,
         }
@@ -157,7 +151,7 @@ export async function requestOceanData(
       error instanceof TypeError
     ) {
       throw new Error(
-        "Unable to reach the ORCA backend.",
+        "Unable to reach the ORCA M4 decision backend.",
         {
           cause: error,
         }
@@ -173,4 +167,19 @@ export async function requestOceanData(
     );
 
   }
+}
+
+
+/*
+ * Legacy name retained only for compatibility.
+ *
+ * It now points to the final M4 decision request.
+ * It does NOT fall back to the old M2 endpoint.
+ */
+export async function requestOceanData(
+  request
+) {
+  return requestDecision(
+    request
+  );
 }

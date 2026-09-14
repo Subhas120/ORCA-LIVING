@@ -5,24 +5,32 @@ function UncertaintyPanel({
   uncertainty = {},
 }) {
   const score =
-    uncertainty.score ??
-    null;
+    uncertainty.score !== null &&
+    uncertainty.score !== undefined
+      ? uncertainty.score
+      : null;
+
+  const suppliedLevel =
+    typeof uncertainty.level === "string" &&
+    uncertainty.level.trim()
+      ? uncertainty.level
+      : null;
 
   const level =
-    uncertainty.level ??
+    suppliedLevel ??
     (
       score !== null
         ? getUncertaintyLevel(score)
-        : "INSUFFICIENT"
+        : "NOT SUPPLIED"
     );
-
 
   const explanation =
     uncertainty.reason ??
+    uncertainty.explanation ??
     (
       score !== null
-        ? "Uncertainty score is derived from the backend confidence value."
-        : "Uncertainty information is not currently available."
+        ? "Uncertainty score supplied by the authoritative decision service."
+        : "Uncertainty information is not currently supplied by the authoritative decision service."
     );
 
 
@@ -44,7 +52,6 @@ function UncertaintyPanel({
 
       <div className="uncertainty-content">
 
-
         <div className="uncertainty-score">
 
           <div>
@@ -56,7 +63,7 @@ function UncertaintyPanel({
             <strong>
               {score !== null
                 ? `${score}%`
-                : "—"}
+                : "NOT SUPPLIED"}
             </strong>
 
           </div>
@@ -98,9 +105,10 @@ function UncertaintyPanel({
           </strong>
 
           <span>
-            Lower uncertainty indicates more
-            consistent evidence. Uncertainty is
-            separate from recommendation quality.
+            Uncertainty is displayed only when
+            supplied by the authoritative decision
+            service. M3 does not derive uncertainty
+            from confidence or recommendation quality.
           </span>
 
         </div>

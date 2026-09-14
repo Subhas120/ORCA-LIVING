@@ -1,6 +1,5 @@
 import { useState } from "react";
 
-
 const TIME_OPTIONS = [
   {
     id: "NOW",
@@ -20,36 +19,28 @@ const TIME_OPTIONS = [
   },
 ];
 
-
 function TemporalDecisionPanel({
   currentDecision,
 }) {
   const [selectedTime, setSelectedTime] =
     useState("NOW");
 
-
   const timeline =
     currentDecision?.timeline ?? {};
 
-
   const currentState =
     timeline[selectedTime] ?? null;
-
 
   const currentRecommendation =
     currentDecision?.recommendedCandidate ??
     null;
 
-
   const isCurrent =
     selectedTime === "NOW";
 
-
   return (
     <section className="temporal-panel">
-
       <div className="panel-title">
-
         <span>
           TEMPORAL DECISION
         </span>
@@ -57,12 +48,9 @@ function TemporalDecisionPanel({
         <span>
           DECISION CHANGE
         </span>
-
       </div>
 
-
       <div className="temporal-intro">
-
         <h2>
           How the decision changes over time
         </h2>
@@ -72,9 +60,7 @@ function TemporalDecisionPanel({
           future marine conditions become available
           from the backend.
         </p>
-
       </div>
-
 
       <div
         style={{
@@ -85,9 +71,7 @@ function TemporalDecisionPanel({
           marginTop: "20px",
         }}
       >
-
         {TIME_OPTIONS.map((option) => {
-
           const available =
             option.id === "NOW"
               ? true
@@ -96,7 +80,6 @@ function TemporalDecisionPanel({
 
           const selected =
             selectedTime === option.id;
-
 
           return (
             <button
@@ -140,13 +123,10 @@ function TemporalDecisionPanel({
                   ? "AVAILABLE"
                   : "BACKEND DATA NEEDED"}
               </div>
-
             </button>
           );
         })}
-
       </div>
-
 
       <div
         style={{
@@ -157,11 +137,8 @@ function TemporalDecisionPanel({
           background: "#0f1e2b",
         }}
       >
-
         {isCurrent ? (
-
           <>
-
             <div
               style={{
                 fontSize: "11px",
@@ -172,7 +149,6 @@ function TemporalDecisionPanel({
               CURRENT DECISION
             </div>
 
-
             <h3
               style={{
                 margin: "8px 0",
@@ -181,7 +157,6 @@ function TemporalDecisionPanel({
               {currentRecommendation?.name ??
                 "Recommendation unavailable"}
             </h3>
-
 
             <p
               style={{
@@ -196,7 +171,6 @@ function TemporalDecisionPanel({
                 "No recommendation reason supplied."}
             </p>
 
-
             <div
               style={{
                 display: "grid",
@@ -206,7 +180,6 @@ function TemporalDecisionPanel({
                 marginTop: "16px",
               }}
             >
-
               <div>
                 <span
                   style={{
@@ -222,10 +195,9 @@ function TemporalDecisionPanel({
                   {currentDecision
                     ?.marineSafety
                     ?.status ??
-                    "—"}
+                    "NOT SUPPLIED"}
                 </strong>
               </div>
-
 
               <div>
                 <span
@@ -244,10 +216,9 @@ function TemporalDecisionPanel({
                   currentDecision
                     ?.confidence !== undefined
                     ? `${currentDecision.confidence}%`
-                    : "—"}
+                    : "NOT SUPPLIED"}
                 </strong>
               </div>
-
 
               <div>
                 <span
@@ -268,18 +239,13 @@ function TemporalDecisionPanel({
                     ?.uncertainty
                     ?.score !== undefined
                     ? `${currentDecision.uncertainty.score}%`
-                    : "—"}
+                    : "NOT SUPPLIED"}
                 </strong>
               </div>
-
             </div>
-
           </>
-
         ) : currentState ? (
-
           <>
-
             <div
               style={{
                 fontSize: "11px",
@@ -290,7 +256,6 @@ function TemporalDecisionPanel({
               FUTURE DECISION STATE
             </div>
 
-
             <h3
               style={{
                 margin: "8px 0",
@@ -300,7 +265,6 @@ function TemporalDecisionPanel({
                 ?.name ??
                 "Recommendation unavailable"}
             </h3>
-
 
             <p
               style={{
@@ -313,13 +277,9 @@ function TemporalDecisionPanel({
                 ?.reason ??
                 "Backend supplied future decision state."}
             </p>
-
           </>
-
         ) : (
-
           <>
-
             <div
               style={{
                 fontSize: "11px",
@@ -330,7 +290,6 @@ function TemporalDecisionPanel({
               FUTURE DATA UNAVAILABLE
             </div>
 
-
             <h3
               style={{
                 margin: "8px 0",
@@ -339,7 +298,6 @@ function TemporalDecisionPanel({
               Backend temporal data required
             </h3>
 
-
             <p
               style={{
                 margin: 0,
@@ -347,20 +305,17 @@ function TemporalDecisionPanel({
                 lineHeight: "1.5",
               }}
             >
-              M2 currently supplies the present decision
-              only. M3 does not generate or predict
+              The M4 decision service currently
+              supplies the present decision only.
+              M3 does not generate or predict
               +6h, +12h, or +24h decisions locally.
               Future states will appear here when the
               backend provides authoritative temporal
               decision data.
             </p>
-
           </>
-
         )}
-
       </div>
-
 
       <div
         style={{
@@ -374,7 +329,6 @@ function TemporalDecisionPanel({
           gap: "5px",
         }}
       >
-
         <strong
           style={{
             fontSize: "11px",
@@ -396,12 +350,9 @@ function TemporalDecisionPanel({
           decision state. M3 does not calculate future
           safety, opportunity, confidence, or rankings.
         </span>
-
       </div>
-
     </section>
   );
 }
-
 
 export default TemporalDecisionPanel;

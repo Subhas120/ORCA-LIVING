@@ -6,7 +6,12 @@ function getConfidence(candidate) {
     return null;
   }
 
-  return Number(candidate.confidence);
+  const value =
+    Number(candidate.confidence);
+
+  return Number.isFinite(value)
+    ? value
+    : null;
 }
 
 
@@ -18,7 +23,12 @@ function getDistance(candidate) {
     return null;
   }
 
-  return Number(candidate.distance);
+  const value =
+    Number(candidate.distance);
+
+  return Number.isFinite(value)
+    ? value
+    : null;
 }
 
 
@@ -74,35 +84,160 @@ function getPointColor(status) {
 }
 
 
+function getParetoId(point) {
+  if (!point) {
+    return null;
+  }
+
+  return (
+    point.id ??
+    point.candidate_id ??
+    point.candidateId ??
+    point.pfz_id ??
+    null
+  );
+}
+
+
+function getParetoX(point) {
+  if (!point) {
+    return null;
+  }
+
+  const value =
+    Number(
+      point.distance ??
+      point.distance_km ??
+      point.x
+    );
+
+  return Number.isFinite(value)
+    ? value
+    : null;
+}
+
+
+function getParetoY(point) {
+  if (!point) {
+    return null;
+  }
+
+  const value =
+    Number(
+      point.confidence ??
+      point.y
+    );
+
+  return Number.isFinite(value)
+    ? value
+    : null;
+}
+
+
+function normalizeParetoPoints(
+  points
+) {
+  if (
+    !Array.isArray(points)
+  ) {
+    return [];
+  }
+
+  return points
+    .map(
+      (point) => ({
+        id:
+          getParetoId(point),
+
+        x:
+          getParetoX(point),
+
+        y:
+          getParetoY(point),
+
+        status:
+          point.status ??
+          null,
+
+        name:
+          point.name ??
+          point.candidate_name ??
+          point.candidateName ??
+          getParetoId(point) ??
+          "Pareto point",
+      })
+    )
+    .filter(
+      (point) =>
+        point.id !== null &&
+        point.x !== null &&
+        point.y !== null
+    );
+}
+
+
 function DecisionFrontier({
   candidates = [],
+  paretoPoints = [],
   selectedCandidateId = null,
   onCandidateSelect,
 }) {
-  const validCandidates = candidates.filter(
-    (candidate) =>
-      getConfidence(candidate) !== null &&
-      getDistance(candidate) !== null
-  );
+  const authoritativeParetoPoints =
+    normalizeParetoPoints(
+      paretoPoints
+    );
+
+
+  const validCandidates =
+    candidates.filter(
+      (candidate) =>
+        getConfidence(candidate) !== null &&
+        getDistance(candidate) !== null
+    );
+
+
+  const usingAuthoritativePareto =
+    authoritativeParetoPoints.length > 0;
+
+
+  const points =
+    usingAuthoritativePareto
+      ? authoritativeParetoPoints
+      : validCandidates.map(
+        (candidate) => ({
+          id:
+            candidate.id,
+
+          x:
+            getDistance(candidate),
+
+          y:
+            getConfidence(candidate),
+
+          status:
+            candidate.status,
+
+          name:
+            candidate.name,
+        })
+      );
 
 
   const maxDistance =
-    validCandidates.length > 0
+    points.length > 0
       ? Math.max(
-        ...validCandidates.map(
-          (candidate) =>
-            getDistance(candidate)
+        ...points.map(
+          (point) => point.x
         )
       )
       : 1;
 
 
   const minDistance =
-    validCandidates.length > 0
+    points.length > 0
       ? Math.min(
-        ...validCandidates.map(
-          (candidate) =>
-            getDistance(candidate)
+        ...points.map(
+          (point) => point.x
         )
       )
       : 0;
@@ -125,7 +260,9 @@ function DecisionFrontier({
         </span>
 
         <span>
-          TRADE-OFF VIEW
+          {usingAuthoritativePareto
+            ? "PARETO DATA"
+            : "TRADE-OFF VIEW"}
         </span>
 
       </div>
@@ -134,19 +271,25 @@ function DecisionFrontier({
       <div className="frontier-intro">
 
         <h2>
-          Candidate trade-offs
+          {usingAuthoritativePareto
+            ? "Authoritative Pareto frontier"
+            : "Candidate trade-offs"}
         </h2>
 
         <p>
-          This view compares backend-supplied
-          candidate attributes. It does not
-          calculate a new recommendation.
+          {usingAuthoritativePareto
+            ? (
+              "This frontier displays Pareto information supplied by the authoritative decision service. M3 does not calculate dominance or optimization."
+            )
+            : (
+              "This view compares backend-supplied candidate attributes. A Pareto frontier is not calculated because authoritative Pareto data was not supplied."
+            )}
         </p>
 
       </div>
 
 
-      {validCandidates.length > 0 ? (
+      {points.length > 0 ? (
 
         <>
 
@@ -156,8 +299,10 @@ function DecisionFrontier({
               height: "320px",
               marginTop: "24px",
               marginBottom: "20px",
-              borderLeft: "1px solid #345064",
-              borderBottom: "1px solid #345064",
+              borderLeft:
+                "1px solid #345064",
+              borderBottom:
+                "1px solid #345064",
               background:
                 "linear-gradient(to top, rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(to right, rgba(255,255,255,0.025) 1px, transparent 1px)",
               backgroundSize:
@@ -172,8 +317,10 @@ function DecisionFrontier({
                 top: "4px",
                 fontSize: "10px",
                 color: "#718797",
-                writingMode: "vertical-rl",
-                transform: "rotate(180deg)",
+                writingMode:
+                  "vertical-rl",
+                transform:
+                  "rotate(180deg)",
               }}
             >
               CONFIDENCE
@@ -193,87 +340,126 @@ function DecisionFrontier({
             </span>
 
 
-            {validCandidates.map(
-              (candidate) => {
-
-                const confidence =
-                  getConfidence(candidate);
-
-                const distance =
-                  getDistance(candidate);
+            {points.map(
+              (point) => {
 
                 const x =
                   8 +
                   (
                     (
-                      distance -
+                      point.x -
                       minDistance
                     ) /
                     distanceRange
                   ) *
                   84;
 
+
                 const y =
                   8 +
                   (
                     100 -
-                    confidence
+                    point.y
                   ) *
                   0.84;
 
+
                 const selected =
                   selectedCandidateId ===
-                  candidate.id;
+                  point.id;
+
 
                 const pointColor =
                   getPointColor(
-                    candidate.status
+                    point.status
                   );
 
 
                 return (
                   <button
-                    key={candidate.id}
+                    key={
+                      point.id
+                    }
+
                     type="button"
+
                     onClick={() => {
+
                       if (
                         onCandidateSelect
                       ) {
-                        onCandidateSelect(
-                          candidate
-                        );
+
+                        const candidate =
+                          candidates.find(
+                            (item) =>
+                              item.id ===
+                              point.id
+                          );
+
+                        if (candidate) {
+                          onCandidateSelect(
+                            candidate
+                          );
+                        }
+
                       }
+
                     }}
+
                     aria-label={
-                      `${candidate.name}, ` +
-                      `${getStateLabel(candidate.status)}, ` +
-                      `${confidence}% confidence, ` +
-                      `${distance} km distance`
+                      `${point.name}, ` +
+                      `${getStateLabel(
+                        point.status
+                      )}, ` +
+                      `${point.y}% confidence, ` +
+                      `${point.x} km distance`
                     }
+
                     style={{
-                      position: "absolute",
-                      left: `${x}%`,
-                      top: `${y}%`,
+                      position:
+                        "absolute",
+
+                      left:
+                        `${x}%`,
+
+                      top:
+                        `${y}%`,
+
                       transform:
                         "translate(-50%, -50%)",
-                      width: selected
-                        ? "20px"
-                        : "15px",
-                      height: selected
-                        ? "20px"
-                        : "15px",
-                      borderRadius: "50%",
-                      border: selected
-                        ? "3px solid #ffffff"
-                        : `2px solid ${pointColor}`,
-                      background: pointColor,
-                      cursor: "pointer",
-                      boxShadow: selected
-                        ? `0 0 0 5px ${pointColor}33`
-                        : "none",
+
+                      width:
+                        selected
+                          ? "20px"
+                          : "15px",
+
+                      height:
+                        selected
+                          ? "20px"
+                          : "15px",
+
+                      borderRadius:
+                        "50%",
+
+                      border:
+                        selected
+                          ? "3px solid #ffffff"
+                          : `2px solid ${pointColor}`,
+
+                      background:
+                        pointColor,
+
+                      cursor:
+                        "pointer",
+
+                      boxShadow:
+                        selected
+                          ? `0 0 0 5px ${pointColor}33`
+                          : "none",
                     }}
                   />
                 );
+
               }
             )}
 
@@ -282,63 +468,108 @@ function DecisionFrontier({
 
           <div
             style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: "10px",
+              display:
+                "flex",
+
+              flexWrap:
+                "wrap",
+
+              gap:
+                "10px",
             }}
           >
 
-            {validCandidates.map(
-              (candidate) => (
+            {points.map(
+              (point) => (
 
                 <button
-                  key={candidate.id}
+                  key={
+                    `legend-${point.id}`
+                  }
+
                   type="button"
+
                   onClick={() => {
+
                     if (
                       onCandidateSelect
                     ) {
-                      onCandidateSelect(
-                        candidate
-                      );
+
+                      const candidate =
+                        candidates.find(
+                          (item) =>
+                            item.id ===
+                            point.id
+                        );
+
+                      if (candidate) {
+                        onCandidateSelect(
+                          candidate
+                        );
+                      }
+
                     }
+
                   }}
+
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "7px",
-                    padding: "8px 10px",
-                    borderRadius: "7px",
+                    display:
+                      "flex",
+
+                    alignItems:
+                      "center",
+
+                    gap:
+                      "7px",
+
+                    padding:
+                      "8px 10px",
+
+                    borderRadius:
+                      "7px",
+
                     border:
                       selectedCandidateId ===
-                      candidate.id
+                      point.id
                         ? "1px solid #ffffff"
                         : "1px solid #223b4d",
-                    background: "#0f1e2b",
-                    color: "#d8e4ec",
-                    cursor: "pointer",
+
+                    background:
+                      "#0f1e2b",
+
+                    color:
+                      "#d8e4ec",
+
+                    cursor:
+                      "pointer",
                   }}
                 >
 
                   <span
                     style={{
-                      width: "9px",
-                      height: "9px",
-                      borderRadius: "50%",
+                      width:
+                        "9px",
+
+                      height:
+                        "9px",
+
+                      borderRadius:
+                        "50%",
+
                       background:
                         getPointColor(
-                          candidate.status
+                          point.status
                         ),
                     }}
                   />
 
                   <span>
-                    {candidate.name}
+                    {point.name}
                   </span>
 
                   <small>
                     {getStateLabel(
-                      candidate.status
+                      point.status
                     )}
                   </small>
 
@@ -353,16 +584,20 @@ function DecisionFrontier({
 
       ) : (
 
-        <div className="integration-status">
+        <div
+          className="integration-status"
+        >
 
           <strong>
             FRONTIER UNAVAILABLE
           </strong>
 
           <span>
-            Candidate confidence and distance
-            attributes are required from the
-            authoritative decision service.
+            Authoritative Pareto data was not
+            supplied, and candidate confidence
+            and distance attributes are not
+            sufficient to construct a trade-off
+            view.
           </span>
 
         </div>
@@ -372,20 +607,36 @@ function DecisionFrontier({
 
       <div
         style={{
-          marginTop: "20px",
-          padding: "15px",
-          border: "1px solid #223b4d",
-          borderRadius: "8px",
-          background: "#0b1722",
+          marginTop:
+            "20px",
+
+          padding:
+            "15px",
+
+          border:
+            "1px solid #223b4d",
+
+          borderRadius:
+            "8px",
+
+          background:
+            "#0b1722",
         }}
       >
 
         <strong
           style={{
-            display: "block",
-            fontSize: "11px",
-            letterSpacing: "0.08em",
-            marginBottom: "6px",
+            display:
+              "block",
+
+            fontSize:
+              "11px",
+
+            letterSpacing:
+              "0.08em",
+
+            marginBottom:
+              "6px",
           }}
         >
           INTERPRETATION
@@ -393,15 +644,23 @@ function DecisionFrontier({
 
         <span
           style={{
-            color: "#aab8c3",
-            fontSize: "13px",
-            lineHeight: "1.5",
+            color:
+              "#aab8c3",
+
+            fontSize:
+              "13px",
+
+            lineHeight:
+              "1.5",
           }}
         >
-          The frontier visualizes attributes supplied
-          by the decision service. It does not perform
-          ranking, dominance analysis, safety assessment,
-          or optimization in the frontend.
+          {usingAuthoritativePareto
+            ? (
+              "Pareto information comes from the authoritative decision service. M3 only renders the supplied result."
+            )
+            : (
+              "The trade-off view visualizes supplied candidate attributes. It does not perform ranking, dominance analysis, safety assessment, Pareto calculation, or optimization."
+            )}
         </span>
 
       </div>

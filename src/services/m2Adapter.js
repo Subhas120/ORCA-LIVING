@@ -1,13 +1,16 @@
 /*
- * M2 → M3 ADAPTER
+ * ORCA DECISION RESPONSE ADAPTER
  *
- * Converts backend responses into a frontend-friendly
- * structure without recreating marine safety, ranking,
- * optimization, or decision logic.
+ * Converts the final M4 DecisionResponse into
+ * the normalized structure consumed by M3.
+ *
+ * M4 is the integration boundary for the
+ * M1 + M2 decision pipeline.
  *
  * IMPORTANT:
- * M3 only displays decision information supplied
- * by the backend.
+ * M3 displays supplied decision semantics.
+ * It does not recreate safety, ranking,
+ * optimization, dominance, or scientific logic.
  */
 
 import {
@@ -25,6 +28,16 @@ const DECISION_STATES = new Set([
 ]);
 
 
+/*
+ * Normalize confidence values without inventing
+ * or transforming missing information.
+ *
+ * Supported backend forms:
+ *   0.91     -> 91
+ *   91       -> 91
+ *   "91%"    -> 91
+ *   "91"     -> 91
+ */
 function confidenceToPercent(
   confidence
 ) {
@@ -36,72 +49,130 @@ function confidenceToPercent(
   }
 
   if (
-    typeof confidence !== "number"
+    typeof confidence === "number"
   ) {
-    return null;
-  }
+    if (
+      confidence >= 0 &&
+      confidence <= 1
+    ) {
+      return Math.round(
+        confidence * 100
+      );
+    }
 
-  return Math.round(
-    confidence * 100
-  );
-}
-
-
-function confidenceToUncertaintyPercent(
-  confidence
-) {
-  if (
-    confidence === null ||
-    confidence === undefined
-  ) {
-    return null;
+    return Math.round(
+      confidence
+    );
   }
 
   if (
-    typeof confidence !== "number"
+    typeof confidence === "string"
   ) {
-    return null;
-  }
+    const trimmed =
+      confidence.trim();
 
-  return Math.round(
-    (1 - confidence) * 100
-  );
-}
+    if (!trimmed) {
+      return null;
+    }
 
-
-function getSemanticState(
-  candidate,
-  fallbackStatus
-) {
-  const suppliedState =
-    candidate?.decision_status ??
-    candidate?.semantic_status ??
-    candidate?.decisionState ??
-    candidate?.decision_state ??
-    null;
-
-  if (
-    typeof suppliedState === "string"
-  ) {
-    const normalized =
-      suppliedState
-        .trim()
-        .toUpperCase()
-        .replace(
-          /[\s-]+/g,
-          "_"
-        );
+    const numeric =
+      Number(
+        trimmed.replace(
+          "%",
+          ""
+        )
+      );
 
     if (
-      DECISION_STATES.has(
-        normalized
+      Number.isFinite(
+        numeric
       )
     ) {
-      return normalized;
+      return Math.round(
+        numeric
+      );
     }
+
+    return trimmed;
   }
 
-  return fallbackStatus;
+  return null;
+}
+
+
+/*
+ * Opportunity is a separate semantic field.
+ *
+ * M4 supplies opportunity as an integer score.
+ * M3 must display it directly and must not
+ * derive it from status or confidence.
+ */
+function opportunityToScore(
+  opportunity
+) {
+  if (
+    opportunity === null ||
+    opportunity === undefined
+  ) {
+    return null;
+  }
+
+  if (
+    typeof opportunity === "number"
+  ) {
+    return Number.isFinite(
+      opportunity
+    )
+      ? opportunity
+      : null;
+  }
+
+  if (
+    typeof opportunity === "string"
+  ) {
+    const numeric =
+      Number(
+        opportunity.replace(
+          "%",
+          ""
+        ).trim()
+      );
+
+    return Number.isFinite(
+      numeric
+    )
+      ? numeric
+      : null;
+  }
+
+  return null;
+}
+
+
+function normalizeState(
+  state,
+  fallback
+) {
+  if (
+    typeof state !== "string"
+  ) {
+    return fallback;
+  }
+
+  const normalized =
+    state
+      .trim()
+      .toUpperCase()
+      .replace(
+        /[\s-]+/g,
+        "_"
+      );
+
+  return DECISION_STATES.has(
+    normalized
+  )
+    ? normalized
+    : fallback;
 }
 
 
@@ -115,19 +186,21 @@ function normalizeCandidate(
 
   return {
     id:
-      candidate.pfz_id ??
       candidate.id ??
+      candidate.pfz_id ??
       null,
 
     name:
       candidate.name ??
-      candidate.pfz_id ??
       candidate.id ??
+      candidate.pfz_id ??
       "Unnamed candidate",
 
     status:
-      getSemanticState(
-        candidate,
+      normalizeState(
+        candidate.status ??
+        candidate.decision_status ??
+        candidate.semantic_status,
         fallbackStatus
       ),
 
@@ -146,19 +219,42 @@ function normalizeCandidate(
       candidate.distance ??
       null,
 
+    /*
+     * Preserve both the semantic opportunity
+     * status and the actual numeric opportunity
+     * score when supplied by M4.
+     */
     opportunityStatus:
       candidate.opportunity_status ??
-      candidate.status ??
       null,
 
     opportunityScore:
-      candidate.opportunity_score ??
-      null,
+      opportunityToScore(
+        candidate.opportunity ??
+        candidate.opportunity_score ??
+        candidate.expected_opportunity
+      ),
+
+    opportunity:
+      opportunityToScore(
+        candidate.opportunity ??
+        candidate.opportunity_score ??
+        candidate.expected_opportunity
+      ),
 
     confidence:
       confidenceToPercent(
         candidate.confidence
       ),
+
+    /*
+     * Safety is deliberately passed through only
+     * when the authoritative candidate contains it.
+     * M3 never derives safety locally.
+     */
+    safety:
+      candidate.safety ??
+      null,
 
     source:
       candidate.source ??
@@ -191,6 +287,32 @@ function normalizeCandidate(
 }
 
 
+function normalizeCandidateArray(
+  candidates,
+  fallbackStatus
+) {
+  if (
+    !Array.isArray(
+      candidates
+    )
+  ) {
+    return [];
+  }
+
+  return candidates
+    .map(
+      (candidate) =>
+        normalizeCandidate(
+          candidate,
+          fallbackStatus
+        )
+    )
+    .filter(
+      Boolean
+    );
+}
+
+
 function normalizeEvidence(
   evidence
 ) {
@@ -199,7 +321,9 @@ function normalizeEvidence(
   }
 
   if (
-    Array.isArray(evidence)
+    Array.isArray(
+      evidence
+    )
   ) {
     return evidence;
   }
@@ -215,6 +339,7 @@ function normalizeEvidence(
   ).map(
     ([parameter, item]) => ({
       id:
+        item?.id ??
         parameter,
 
       parameter:
@@ -249,13 +374,15 @@ function normalizeEvidence(
 function normalizeArray(
   value
 ) {
-  return Array.isArray(value)
+  return Array.isArray(
+    value
+  )
     ? value
     : [];
 }
 
 
-function normalizeAnalysis(
+function normalizeObject(
   value
 ) {
   if (
@@ -275,190 +402,267 @@ function normalizeAnalysis(
 }
 
 
-export function adaptM2Response(
+function adaptDecisionIntelligence(
+  response
+) {
+  const intelligence =
+    response.decision_intelligence ??
+    response.decisionIntelligence ??
+    response.decision ??
+    null;
+
+  if (
+    !intelligence ||
+    typeof intelligence !== "object"
+  ) {
+    return null;
+  }
+
+  return {
+    recommendedCandidate:
+      intelligence.recommended_candidate ??
+      intelligence.recommendedCandidate ??
+      null,
+
+    alternativeCandidates:
+      normalizeArray(
+        intelligence.alternative_candidates ??
+        intelligence.alternativeCandidates
+      ),
+
+    rejectedCandidates:
+      normalizeArray(
+        intelligence.rejected_candidates ??
+        intelligence.rejectedCandidates
+      ),
+
+    rejectionReasons:
+      normalizeArray(
+        intelligence.rejection_reasons ??
+        intelligence.rejectionReasons
+      ),
+
+    paretoPoints:
+      normalizeArray(
+        intelligence.pareto_points ??
+        intelligence.paretoPoints
+      ),
+
+    tradeoffs:
+      normalizeArray(
+        intelligence.tradeoffs
+      ),
+
+    evidenceRefs:
+      normalizeArray(
+        intelligence.evidence_refs ??
+        intelligence.evidenceRefs
+      ),
+
+    uncertaintyRefs:
+      normalizeArray(
+        intelligence.uncertainty_refs ??
+        intelligence.uncertaintyRefs
+      ),
+
+    robustness:
+      normalizeObject(
+        intelligence.robustness
+      ),
+
+    sensitivity:
+      normalizeObject(
+        intelligence.sensitivity
+      ),
+
+    valueOfInformation:
+      normalizeObject(
+        intelligence.value_of_information ??
+        intelligence.valueOfInformation
+      ),
+
+    counterfactuals:
+      normalizeArray(
+        intelligence.counterfactuals
+      ),
+
+    explanation:
+      intelligence.explanation ??
+      null,
+
+    decisionTrace:
+      normalizeArray(
+        intelligence.decision_trace ??
+        intelligence.decisionTrace
+      ),
+
+    confidence:
+      confidenceToPercent(
+        intelligence.confidence
+      ),
+
+    summary:
+      intelligence.summary ??
+      null,
+  };
+}
+
+
+function adaptAuthoritativeCandidates(
+  response,
+  intelligence
+) {
+  const recommended =
+    normalizeCandidate(
+      response.recommended_candidate ??
+      response.recommendedCandidate ??
+      intelligence?.recommendedCandidate,
+      "RECOMMENDED"
+    );
+
+  const alternatives =
+    normalizeCandidateArray(
+      response.alternative_candidates ??
+      response.alternativeCandidates ??
+      intelligence?.alternativeCandidates,
+      "ALTERNATIVE"
+    );
+
+  const rejected =
+    normalizeCandidateArray(
+      response.rejected_candidates ??
+      response.rejectedCandidates ??
+      intelligence?.rejectedCandidates,
+      "REJECTED"
+    );
+
+  return {
+    recommended,
+    alternatives,
+    rejected,
+    candidates: [
+      ...(recommended
+        ? [recommended]
+        : []),
+      ...alternatives,
+      ...rejected,
+    ],
+  };
+}
+
+
+export function adaptDecisionResponse(
   response
 ) {
   if (!response) {
     throw new Error(
-      "M2 response is missing."
+      "Decision response is missing."
     );
   }
-
 
   if (
     typeof response !== "object"
   ) {
     throw new Error(
-      "Backend response is malformed."
+      "Decision response is malformed."
     );
   }
-
-
-  const data =
-    response.data ?? {};
-
 
   if (
-    typeof data !== "object"
+    typeof response.status !== "string"
   ) {
     throw new Error(
-      "Backend response data is malformed."
+      "Decision response is missing a valid status."
     );
   }
 
-
-  const recommendation =
-    data.pfz_recommendation ??
-    {};
-
-
-  if (
-    typeof recommendation !== "object"
-  ) {
-    throw new Error(
-      "PFZ recommendation data is malformed."
-    );
-  }
-
-
-  const recommended =
-    normalizeCandidate(
-      recommendation.recommended,
-      "RECOMMENDED"
+  const intelligence =
+    adaptDecisionIntelligence(
+      response
     );
 
-
-  const alternatives =
-    normalizeArray(
-      recommendation.alternatives
-    ).map(
-      (candidate) =>
-        normalizeCandidate(
-          candidate,
-          "ALTERNATIVE"
-        )
+  const candidateState =
+    adaptAuthoritativeCandidates(
+      response,
+      intelligence
     );
 
-
-  const rejected =
-    normalizeArray(
-      recommendation.rejected
-    ).map(
-      (candidate) =>
-        normalizeCandidate(
-          candidate,
-          "REJECTED"
-        )
-    );
-
-
-  const candidates = [
-    ...(recommended
-      ? [recommended]
-      : []),
-
-    ...alternatives,
-
-    ...rejected,
-  ];
-
-
-  const pfz =
-    normalizeArray(
-      data.pfz
-    );
-
-
-  const mapCoordinates =
-    pfz
-      .map(
-        (candidate) => ({
-          id:
-            candidate.pfz_id ??
-            candidate.id ??
-            null,
-
-          lat:
-            candidate.latitude ??
-            candidate.lat ??
-            null,
-
-          lng:
-            candidate.longitude ??
-            candidate.lng ??
-            null,
-        })
-      )
-      .filter(
-        (candidate) =>
-          typeof candidate.lat === "number" &&
-          typeof candidate.lng === "number"
-      );
-
-
-  const uncertaintyScore =
-    confidenceToUncertaintyPercent(
-      response.confidence
-    );
-
-
-  const marineSafety =
-    data.marine_safety ?? {};
-
-
-  const backendUncertainty =
-    marineSafety.uncertainty ??
-    {};
-
+  /*
+   * IMPORTANT:
+   * Uncertainty is authoritative only when
+   * the backend actually supplies it.
+   *
+   * Never calculate:
+   *   uncertainty = 100 - confidence
+   */
+  const uncertainty =
+    normalizeObject(
+      response.uncertainty
+    ) ??
+    null;
 
   const sensitivity =
-    normalizeAnalysis(
-      data.sensitivity ??
+    normalizeObject(
       response.sensitivity
-    );
+    ) ??
+    intelligence?.sensitivity ??
+    null;
 
+  const robustness =
+    normalizeObject(
+      response.robustness
+    ) ??
+    intelligence?.robustness ??
+    null;
 
   const counterfactual =
-    normalizeAnalysis(
-      data.counterfactual ??
-      data.counterfactual_results ??
+    normalizeObject(
       response.counterfactual ??
       response.counterfactual_results
     );
 
-
-  const robustness =
-    normalizeAnalysis(
-      data.robustness ??
-      response.robustness
-    );
-
-
   const informationGaps =
     normalizeArray(
-      data.information_gaps ??
-      response.information_gaps
+      response.information_gaps ??
+      response.informationGaps
     );
 
+  const evidence =
+    normalizeEvidence(
+      response.evidence ??
+      response.evidence_links
+    );
 
   const gis =
     adaptGISData(
-      data.gis ??
-      data.gis_data ??
       response.gis ??
       response.gis_data
     );
 
+  const confidence =
+    confidenceToPercent(
+      response.confidence ??
+      intelligence?.confidence ??
+      response.recommendedCandidate?.confidence ??
+      response.recommended_candidate?.confidence
+    );
+
+  const decisionStatus =
+    response.status ??
+    null;
+
+  const marineSafety =
+    response.marine_safety ??
+    response.marineSafety ??
+    {};
 
   return {
-
     status:
-      response.status ??
-      null,
+      decisionStatus,
 
     agent:
       response.agent ??
-      null,
+      "decision",
 
     location:
       response.location ??
@@ -472,42 +676,34 @@ export function adaptM2Response(
       response.timestamp ??
       null,
 
-    confidence:
-      confidenceToPercent(
-        response.confidence
-      ),
+    /*
+     * Preserve the backend data mode.
+     *
+     * M3 must not reinterpret DEMO as LIVE.
+     */
+    dataMode:
+      response.dataMode ??
+      response.data_mode ??
+      "UNKNOWN",
+
+    confidence,
 
     error:
       response.error ??
       null,
 
-
-    marineConditions: {
-
-      sst:
-        data.sst ??
-        null,
-
-      chlorophyll:
-        data.chlorophyll ??
-        null,
-
-      waveHeight:
-        data.wave_height ??
-        null,
-
-      wavePeriod:
-        data.wave_period ??
-        null,
-
-      currentSpeed:
-        data.current_speed ??
-        null,
-    },
-
+    marineConditions:
+      response.marine_conditions ??
+      response.marineConditions ??
+      {
+        sst: null,
+        chlorophyll: null,
+        waveHeight: null,
+        wavePeriod: null,
+        currentSpeed: null,
+      },
 
     marineSafety: {
-
       status:
         marineSafety.status ??
         null,
@@ -523,49 +719,69 @@ export function adaptM2Response(
         ),
     },
 
-
+    /*
+     * No fallback from confidence.
+     * If M4 does not supply uncertainty,
+     * the UI receives null and can display
+     * NOT SUPPLIED.
+     */
     uncertainty: {
-
       level:
-        backendUncertainty.level ??
+        uncertainty?.level ??
         null,
 
       reason:
-        backendUncertainty.reason ??
+        uncertainty?.reason ??
+        uncertainty?.explanation ??
         null,
 
       score:
-        uncertaintyScore,
+        uncertainty?.score !== undefined &&
+        uncertainty?.score !== null
+          ? confidenceToPercent(
+              uncertainty.score
+            )
+          : null,
     },
 
+    pfz:
+      normalizeArray(
+        response.pfz
+      ),
 
-    pfz,
-
-    candidates,
+    candidates:
+      candidateState.candidates,
 
     recommendedCandidate:
-      recommended,
+      candidateState.recommended,
 
     alternativeCandidates:
-      alternatives,
+      candidateState.alternatives,
 
     rejectedCandidates:
-      rejected,
-
+      candidateState.rejected,
 
     recommendation: {
-
       reason:
-        recommendation.reason ??
+        response.decision_summary ??
+        response.decisionSummary ??
+        intelligence?.summary ??
         null,
     },
 
+    decisionSummary:
+      response.decision_summary ??
+      response.decisionSummary ??
+      intelligence?.summary ??
+      null,
 
-    evidence:
-      normalizeEvidence(
-        data.evidence
+    tradeoffs:
+      normalizeArray(
+        response.tradeoffs ??
+        intelligence?.tradeoffs
       ),
 
+    evidence,
 
     sensitivity,
 
@@ -575,14 +791,31 @@ export function adaptM2Response(
 
     informationGaps,
 
+    decisionIntelligence:
+      intelligence,
 
     gis,
 
-
     map: {
-
       coordinates:
-        mapCoordinates,
+        candidateState.candidates
+          .map(
+            (candidate) => ({
+              id:
+                candidate.id,
+
+              lat:
+                candidate.lat,
+
+              lng:
+                candidate.lng,
+            })
+          )
+          .filter(
+            (candidate) =>
+              typeof candidate.lat === "number" &&
+              typeof candidate.lng === "number"
+          ),
 
       hazards:
         normalizeArray(
@@ -593,19 +826,122 @@ export function adaptM2Response(
         [],
     },
 
-
     decisionMetadata: {
-
       authoritative:
-        false,
+        true,
 
       contract:
-        "M2 AgentResponse",
+        "M4 DecisionResponse",
 
       note:
-        "M2 response is displayed as supplied. M3 does not recreate decision intelligence.",
-
+        "Decision information is displayed from the final M4 integration response. M3 does not recreate decision intelligence.",
     },
-
   };
+}
+
+
+/*
+ * Backward-compatible adapter for the older
+ * M2 AgentResponse.
+ *
+ * Kept temporarily so existing imports do not
+ * break while the final M4 contract is adopted.
+ */
+export function adaptM2Response(
+  response
+) {
+  if (
+    response?.data?.pfz_recommendation
+  ) {
+    const data =
+      response.data;
+
+    const recommendation =
+      data.pfz_recommendation ??
+      {};
+
+    const adapted =
+      adaptDecisionResponse({
+        status:
+          response.status ??
+          "success",
+
+        agent:
+          response.agent ??
+          "ocean",
+
+        location:
+          response.location ??
+          null,
+
+        source:
+          response.source ??
+          null,
+
+        timestamp:
+          response.timestamp ??
+          null,
+
+        confidence:
+          response.confidence ??
+          null,
+
+        recommended_candidate:
+          recommendation.recommended,
+
+        alternative_candidates:
+          recommendation.alternatives,
+
+        rejected_candidates:
+          recommendation.rejected,
+
+        decision_summary:
+          recommendation.reason,
+
+        evidence:
+          data.evidence,
+
+        pfz:
+          data.pfz,
+
+        marine_safety:
+          data.marine_safety,
+
+        sensitivity:
+          data.sensitivity,
+
+        counterfactual:
+          data.counterfactual,
+
+        robustness:
+          data.robustness,
+
+        information_gaps:
+          data.information_gaps,
+
+        dataMode:
+          response.dataMode ??
+          response.data_mode ??
+          "UNKNOWN",
+      });
+
+    return {
+      ...adapted,
+
+      decisionMetadata: {
+        authoritative:
+          false,
+
+        contract:
+          "M2 AgentResponse",
+
+        note:
+          "Legacy M2 response displayed for backward compatibility. Final M3 runtime should use M4 DecisionResponse.",
+      },
+    };
+  }
+
+  return adaptDecisionResponse(
+    response
+  );
 }

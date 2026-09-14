@@ -207,7 +207,7 @@ function MapContent({
 
       <TileLayer
         attribution="&copy; OpenStreetMap contributors"
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        url="https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"
         eventHandlers={{
           tileerror: () => {
             setTileError(true);

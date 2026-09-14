@@ -19,88 +19,110 @@ import DecisionAnalysisPanel from "./components/decision/DecisionAnalysisPanel";
 
 function App() {
   const [decision, setDecision] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [error, setError] =
+    useState(null);
+
   const [selectedCandidateId, setSelectedCandidateId] =
     useState(null);
 
 
   useEffect(() => {
     const endpoint =
-      import.meta.env.VITE_ORCA_OCEAN_ENDPOINT;
+      import.meta.env.VITE_ORCA_DECISION_ENDPOINT;
 
     if (!endpoint) {
       return;
     }
+
 
     async function loadDecision() {
       try {
         setLoading(true);
         setError(null);
 
-        const result = await getDecision({
-          query:
-            demoDecisionState.objective.text,
+        const result =
+          await getDecision({
+            query:
+              demoDecisionState
+                .objective
+                .text,
 
-          location: null,
+            location:
+              "Kochi",
 
-          destination: null,
+            date:
+              "2026-09-15",
 
-          date: null,
+            time:
+              "morning",
 
-          time:
-            demoDecisionState.objective.time,
+            activity:
+              "fishing",
 
-          activity: "fishing",
-        });
+            vessel_type:
+              demoDecisionState
+                .objective
+                .vessel,
+          });
 
-        setDecision(result);
+        setDecision(
+          result
+        );
 
       } catch (err) {
-        console.error(err);
+        console.error(
+          err
+        );
 
         setError(
-          err.message ||
+          err?.message ??
           "Unable to load ORCA decision."
         );
 
       } finally {
-        setLoading(false);
+        setLoading(
+          false
+        );
       }
     }
+
 
     loadDecision();
 
   }, []);
 
 
-  const usingM2 =
+  const usingM4 =
     decision !== null;
 
 
   const currentDecision =
-    usingM2
+    usingM4
       ? decision
       : demoDecisionState;
 
 
   const currentCandidates =
     useMemo(
-      () =>
-        Array.isArray(
-          usingM2
+      () => {
+        const source =
+          usingM4
             ? decision?.candidates
-            : demoCandidates
+            : demoCandidates;
+
+        return Array.isArray(
+          source
         )
-          ? (
-            usingM2
-              ? decision.candidates
-              : demoCandidates
-          )
-          : [],
+          ? source
+          : [];
+      },
       [
         decision,
-        usingM2,
+        usingM4,
       ]
     );
 
@@ -114,34 +136,55 @@ function App() {
 
 
   const recommended =
-    usingM2
-      ? decision.recommendedCandidate
-      : demoDecisionState.recommendedCandidate;
+    usingM4
+      ? decision?.recommendedCandidate
+      : demoDecisionState
+          .recommendedCandidate;
 
 
   const uncertaintyScore =
-    usingM2
+    usingM4
       ? (
-        currentDecision.uncertainty?.score !== null &&
-        currentDecision.uncertainty?.score !== undefined
-          ? currentDecision.uncertainty.score
-          : currentDecision.confidence !== null &&
-            currentDecision.confidence !== undefined
-            ? 100 - currentDecision.confidence
-            : null
-      )
-      : recommended?.uncertainty ?? null;
+          decision?.uncertainty?.score ??
+          null
+        )
+      : (
+          recommended?.uncertainty ??
+          null
+        );
 
 
   const decisionStatus =
-    currentDecision.status ??
-    currentDecision.marineSafety?.status ??
+    currentDecision?.status ??
     null;
 
 
   const hasRecommendation =
     recommended !== null &&
     recommended !== undefined;
+
+
+  const paretoPoints =
+    usingM4
+      ? (
+          currentDecision
+            ?.decisionIntelligence
+            ?.paretoPoints ??
+          []
+        )
+      : [];
+
+
+  const dataMode =
+    usingM4
+      ? (
+          currentDecision?.dataMode ??
+          "UNKNOWN"
+        )
+      : (
+          demoDecisionState.dataMode ??
+          "SIMULATED"
+        );
 
 
   function handleCandidateSelect(
@@ -159,8 +202,10 @@ function App() {
     candidate
   ) {
     if (
-      event.key === "Enter" ||
-      event.key === " "
+      event.key ===
+        "Enter" ||
+      event.key ===
+        " "
     ) {
       event.preventDefault();
 
@@ -192,16 +237,16 @@ function App() {
         <div
           className="data-mode"
           aria-label={
-            usingM2
-              ? "M2 backend connected"
+            usingM4
+              ? "Final M4 decision backend connected"
               : "Simulated demonstration data"
           }
         >
 
-          ●{" "}
+          {"●"}{" "}
 
-          {usingM2
-            ? "M2 BACKEND CONNECTED"
+          {usingM4
+            ? "M4 DECISION BACKEND CONNECTED"
             : "SIMULATED DEMO"}
 
         </div>
@@ -221,11 +266,12 @@ function App() {
           >
 
             <strong>
-              CONNECTING TO ORCA BACKEND
+              CONNECTING TO ORCA DECISION BACKEND
             </strong>
 
             <span>
-              Loading the latest marine decision...
+              Loading the latest M4 decision
+              through the integration endpoint...
             </span>
 
           </section>
@@ -241,7 +287,7 @@ function App() {
           >
 
             <strong>
-              BACKEND UNAVAILABLE
+              M4 BACKEND UNAVAILABLE
             </strong>
 
             <span>
@@ -253,7 +299,7 @@ function App() {
         )}
 
 
-        {!usingM2 &&
+        {!usingM4 &&
           !loading &&
           !error && (
 
@@ -267,9 +313,10 @@ function App() {
               </strong>
 
               <span>
-                M2 HTTP endpoint is not configured.
-                The dashboard is displaying clearly
-                labelled simulated demonstration data.
+                The final M4 decision endpoint
+                is not configured. The dashboard
+                is displaying clearly labelled
+                simulated demonstration data.
               </span>
 
             </section>
@@ -290,9 +337,10 @@ function App() {
               </strong>
 
               <span>
-                The M2 backend could not be reached.
-                The dashboard is displaying clearly
-                labelled simulated demonstration data.
+                The final M4 decision backend
+                could not be reached. The dashboard
+                is displaying clearly labelled
+                simulated demonstration data.
               </span>
 
             </section>
@@ -307,14 +355,22 @@ function App() {
           </span>
 
           <h2>
-            {demoDecisionState.objective.text}
+            {demoDecisionState
+              .objective
+              .text}
           </h2>
 
           <p>
             Vessel:{" "}
-            {demoDecisionState.objective.vessel}
+            {demoDecisionState
+              .objective
+              .vessel}
+
             {" · "}
-            {demoDecisionState.objective.time}
+
+            {demoDecisionState
+              .objective
+              .time}
           </p>
 
         </section>
@@ -340,6 +396,7 @@ function App() {
 
 
             <MarineMap
+
               candidates={
                 currentCandidates
               }
@@ -353,7 +410,7 @@ function App() {
               }
 
               gis={
-                currentDecision.gis ??
+                currentDecision?.gis ??
                 null
               }
 
@@ -372,21 +429,22 @@ function App() {
 
               <span
                 className="confidence"
-                aria-label={
-                  usingM2
-                    ? "Decision confidence"
-                    : "Demo confidence"
-                }
+                aria-label="Decision confidence"
               >
 
-                {usingM2
+                {usingM4
                   ? (
-                    currentDecision.confidence !== null
-                      ? `${currentDecision.confidence}%`
-                      : "UNKNOWN"
-                  )
-                  : recommended?.confidence ??
-                    "UNKNOWN"}
+                      currentDecision
+                        ?.confidence !== null &&
+                      currentDecision
+                        ?.confidence !== undefined
+                        ? `${currentDecision.confidence}%`
+                        : "NOT SUPPLIED"
+                    )
+                  : (
+                      recommended?.confidence ??
+                      "UNKNOWN"
+                    )}
 
               </span>
 
@@ -408,24 +466,33 @@ function App() {
 
               <p>
 
-                {usingM2
+                {usingM4
                   ? (
-                    currentDecision.recommendation
-                      ?.reason ??
-                    (
-                      hasRecommendation
-                        ? "Recommendation reason unavailable."
-                        : "The backend did not supply a recommendation."
+                      currentDecision
+                        ?.recommendation
+                        ?.reason ??
+                      currentDecision
+                        ?.decisionSummary ??
+                      (
+                        hasRecommendation
+                          ? "Recommendation reason unavailable."
+                          : "The backend did not supply a recommendation."
+                      )
                     )
-                  )
-                  : demoDecisionState.decisionSummary}
+                  : (
+                      demoDecisionState
+                        .decisionSummary
+                    )}
 
               </p>
 
             </div>
 
 
-            {usingM2 && (
+            {usingM4 &&
+              currentDecision
+                ?.marineSafety
+                ?.status && (
 
               <div className="marine-safety">
 
@@ -434,15 +501,21 @@ function App() {
                 </span>
 
                 <strong>
-                  {currentDecision.marineSafety.status ??
-                    "UNKNOWN"}
+                  {currentDecision
+                    .marineSafety
+                    .status}
                 </strong>
 
-                {currentDecision.marineSafety
-                  .reasons?.map(
+
+                {currentDecision
+                  .marineSafety
+                  .reasons
+                  ?.map(
                     (reason) => (
 
-                      <p key={reason}>
+                      <p
+                        key={reason}
+                      >
                         {reason}
                       </p>
 
@@ -465,14 +538,19 @@ function App() {
 
                 <strong>
 
-                  {usingM2
+                  {usingM4
                     ? (
-                      currentDecision.marineSafety
-                        .status ?? "—"
-                    )
-                    : recommended?.safety !== undefined
-                      ? `${recommended.safety}%`
-                      : "—"}
+                        currentDecision
+                          ?.marineSafety
+                          ?.status ??
+                        "NOT SUPPLIED"
+                      )
+                    : (
+                        recommended
+                          ?.safety !== undefined
+                          ? `${recommended.safety}%`
+                          : "NOT SUPPLIED"
+                      )}
 
                 </strong>
 
@@ -487,17 +565,21 @@ function App() {
 
                 <strong>
 
-                  {usingM2
+                  {usingM4
                     ? (
-                      recommended?.opportunityStatus
-                        ?.replace(
-                          "_",
-                          " "
-                        ) ?? "—"
-                    )
-                    : recommended?.opportunity !== undefined
-                      ? `${recommended.opportunity}%`
-                      : "—"}
+                        recommended
+                          ?.opportunity !== null &&
+                        recommended
+                          ?.opportunity !== undefined
+                          ? `${recommended.opportunity}%`
+                          : "NOT SUPPLIED"
+                      )
+                    : (
+                        recommended
+                          ?.opportunity !== undefined
+                          ? `${recommended.opportunity}%`
+                          : "NOT SUPPLIED"
+                      )}
 
                 </strong>
 
@@ -515,7 +597,7 @@ function App() {
                   {uncertaintyScore !== null &&
                   uncertaintyScore !== undefined
                     ? `${uncertaintyScore}%`
-                    : "—"}
+                    : "NOT SUPPLIED"}
 
                 </strong>
 
@@ -530,10 +612,12 @@ function App() {
 
                 <strong>
 
-                  {recommended?.distance !== null &&
-                  recommended?.distance !== undefined
+                  {recommended
+                    ?.distance !== null &&
+                  recommended
+                    ?.distance !== undefined
                     ? `${recommended.distance} km`
-                    : "—"}
+                    : "NOT SUPPLIED"}
 
                 </strong>
 
@@ -549,21 +633,22 @@ function App() {
               </h3>
 
 
-              {usingM2 ? (
+              {usingM4 ? (
 
-                currentDecision.recommendation
-                  ?.reason ? (
+                currentDecision
+                  ?.decisionSummary ? (
 
                   <p>
-                    ✓{" "}
-                    {currentDecision.recommendation.reason}
+                    {"✓"}{" "}
+                    {currentDecision
+                      .decisionSummary}
                   </p>
 
                 ) : (
 
                   <p>
                     {hasRecommendation
-                      ? "No recommendation reason available."
+                      ? "No decision explanation was supplied by the backend."
                       : "No recommendation was supplied by the backend."}
                   </p>
 
@@ -571,15 +656,19 @@ function App() {
 
               ) : (
 
-                demoDecisionState.tradeoffs.map(
-                  (tradeoff) => (
+                demoDecisionState
+                  .tradeoffs
+                  .map(
+                    (tradeoff) => (
 
-                    <p key={tradeoff}>
-                      ✓ {tradeoff}
-                    </p>
+                      <p
+                        key={tradeoff}
+                      >
+                        {"✓"} {tradeoff}
+                      </p>
 
+                    )
                   )
-                )
 
               )}
 
@@ -591,17 +680,22 @@ function App() {
 
 
         <MarineConditions
+
           conditions={
-            usingM2
-              ? currentDecision.marineConditions
-              : demoDecisionState.marineConditions
+            usingM4
+              ? currentDecision
+                  ?.marineConditions
+              : demoDecisionState
+                  .marineConditions
           }
 
           safety={
-            usingM2
-              ? currentDecision.marineSafety
+            usingM4
+              ? currentDecision
+                  ?.marineSafety
               : null
           }
+
         />
 
 
@@ -655,8 +749,9 @@ function App() {
               </strong>
 
               <span>
-                The backend did not supply candidate
-                locations for this decision.
+                The decision service did not
+                supply candidate locations for
+                this decision.
               </span>
 
             </div>
@@ -676,18 +771,22 @@ function App() {
                   return (
                     <div
                       key={candidate.id}
-                      className={`candidate-card ${
-                        (
-                          candidate.status ??
-                          "unknown"
-                        ).toLowerCase()
-                      } ${
-                        isSelected
-                          ? "selected"
-                          : ""
-                      }`}
+
+                      className={
+                        `candidate-card ${
+                          (
+                            candidate.status ??
+                            "unknown"
+                          ).toLowerCase()
+                        } ${
+                          isSelected
+                            ? "selected"
+                            : ""
+                        }`
+                      }
 
                       role="button"
+
                       tabIndex={0}
 
                       aria-pressed={
@@ -695,7 +794,9 @@ function App() {
                       }
 
                       aria-label={
-                        `${candidate.name}, ${candidate.status ?? "unknown status"}. Select candidate.`
+                        `${candidate.name}, ` +
+                        `${candidate.status ?? "unknown status"}. ` +
+                        `Select candidate.`
                       }
 
                       onClick={() =>
@@ -737,7 +838,12 @@ function App() {
 
                           <strong>
                             {candidate.distance ??
-                              "—"} km
+                              "NOT SUPPLIED"}
+
+                            {candidate.distance !== null &&
+                            candidate.distance !== undefined
+                              ? " km"
+                              : ""}
                           </strong>
 
                         </div>
@@ -751,14 +857,12 @@ function App() {
 
                           <strong>
 
-                            {usingM2
-                              ? (
-                                candidate.opportunityStatus ??
-                                "—"
-                              )
-                              : candidate.opportunity !== undefined
-                                ? `${candidate.opportunity}%`
-                                : "—"}
+                            {candidate
+                              .opportunity !== null &&
+                            candidate
+                              .opportunity !== undefined
+                              ? `${candidate.opportunity}%`
+                              : "NOT SUPPLIED"}
 
                           </strong>
 
@@ -773,10 +877,12 @@ function App() {
 
                           <strong>
 
-                            {candidate.confidence !== null &&
-                            candidate.confidence !== undefined
+                            {candidate
+                              .confidence !== null &&
+                            candidate
+                              .confidence !== undefined
                               ? `${candidate.confidence}%`
-                              : "—"}
+                              : "NOT SUPPLIED"}
 
                           </strong>
 
@@ -791,8 +897,10 @@ function App() {
 
                           <strong>
 
-                            {typeof candidate.lat === "number" &&
-                            typeof candidate.lng === "number"
+                            {typeof candidate.lat ===
+                              "number" &&
+                            typeof candidate.lng ===
+                              "number"
                               ? (
                                 <>
                                   {candidate.lat.toFixed(2)}
@@ -801,7 +909,7 @@ function App() {
                                   {"°"}
                                 </>
                               )
-                              : "—"}
+                              : "NOT SUPPLIED"}
 
                           </strong>
 
@@ -814,7 +922,6 @@ function App() {
 
                         {candidate.reason ??
                           candidate.rejectionReason ??
-                          candidate.opportunityStatus ??
                           ""}
 
                       </p>
@@ -833,18 +940,20 @@ function App() {
 
         <EvidencePanel
 
-          candidate={recommended}
+          candidate={
+            recommended
+          }
 
           evidence={
-            usingM2
-              ? currentDecision.evidence
-              : demoDecisionState.evidence
+            usingM4
+              ? currentDecision
+                  ?.evidence
+              : demoDecisionState
+                  .evidence
           }
 
           dataMode={
-            usingM2
-              ? "M2 BACKEND"
-              : demoDecisionState.dataMode
+            dataMode
           }
 
         />
@@ -853,12 +962,14 @@ function App() {
         <UncertaintyPanel
 
           uncertainty={
-            usingM2
-              ? {
-                ...currentDecision.uncertainty,
-                score: uncertaintyScore,
-              }
-              : currentDecision.uncertainty
+            usingM4
+              ? (
+                  currentDecision
+                    ?.uncertainty ??
+                  {}
+                )
+              : currentDecision
+                  ?.uncertainty
           }
 
         />
@@ -867,9 +978,7 @@ function App() {
         <DataStatusPanel
 
           dataMode={
-            usingM2
-              ? "M2 BACKEND"
-              : demoDecisionState.dataMode
+            dataMode
           }
 
           status={
@@ -877,22 +986,26 @@ function App() {
           }
 
           source={
-            currentDecision.source ??
+            currentDecision
+              ?.source ??
             null
           }
 
           timestamp={
-            currentDecision.timestamp ??
+            currentDecision
+              ?.timestamp ??
             null
           }
 
           confidence={
-            currentDecision.confidence ??
+            currentDecision
+              ?.confidence ??
             null
           }
 
           evidence={
-            currentDecision.evidence ??
+            currentDecision
+              ?.evidence ??
             []
           }
 
@@ -914,38 +1027,58 @@ function App() {
 
 
         <TemporalDecisionPanel
+
           currentDecision={
             currentDecision
           }
+
         />
 
 
         <DecisionFrontier
+
           candidates={
             currentCandidates
           }
+
+          paretoPoints={
+            paretoPoints
+          }
+
+          selectedCandidateId={
+            selectedCandidateId
+          }
+
+          onCandidateSelect={
+            handleCandidateSelect
+          }
+
         />
 
 
         <DecisionAnalysisPanel
 
           sensitivity={
-            currentDecision.sensitivity ??
+            currentDecision
+              ?.sensitivity ??
             null
           }
 
           counterfactual={
-            currentDecision.counterfactual ??
+            currentDecision
+              ?.counterfactual ??
             null
           }
 
           robustness={
-            currentDecision.robustness ??
+            currentDecision
+              ?.robustness ??
             null
           }
 
           informationGaps={
-            currentDecision.informationGaps ??
+            currentDecision
+              ?.informationGaps ??
             []
           }
 
@@ -953,7 +1086,6 @@ function App() {
 
 
         <WhatIfPanel />
-
 
       </main>
 
