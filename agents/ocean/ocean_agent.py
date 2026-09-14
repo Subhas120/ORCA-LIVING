@@ -4,6 +4,7 @@ from datetime import datetime
 
 from agents.common.agent_contract import AgentRequest, AgentResponse
 from agents.ocean.safety import assess_marine_safety
+from agents.ocean.recommendation import get_pfz_recommendation
 
 
 REQUIRED_FIELDS = [
@@ -130,6 +131,10 @@ def handle_ocean(request: AgentRequest) -> AgentResponse:
             current_speed,
         )
 
+        pfz_recommendation = get_pfz_recommendation(
+            pfz_data
+        )
+
         data = {
             "sst": get_parameter_value(
                 marine_data,
@@ -147,6 +152,7 @@ def handle_ocean(request: AgentRequest) -> AgentResponse:
             "current_speed": current_speed,
             "marine_safety": marine_safety,
             "pfz": pfz_data,
+            "pfz_recommendation": pfz_recommendation,
         }
 
         confidence_values = [
