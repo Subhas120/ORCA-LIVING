@@ -8,6 +8,7 @@ from agents.ocean.ocean_agent import (
     normalize_observation,
     validate_observation,
 )
+from agents.ocean.safety import assess_marine_safety
 
 
 class TestOceanAgent(unittest.TestCase):
@@ -104,7 +105,44 @@ class TestOceanAgent(unittest.TestCase):
         self.assertIn("wave_height", response.data)
         self.assertIn("wave_period", response.data)
         self.assertIn("current_speed", response.data)
+        self.assertIn("marine_safety", response.data)
         self.assertIn("pfz", response.data)
+
+    def test_marine_safety_safe(self):
+        result = assess_marine_safety(1.2, 0.6)
+
+        self.assertEqual(result["status"], "SAFE")
+        self.assertEqual(result["hazards"], [])
+
+    def test_marine_safety_unsafe(self):
+        result = assess_marine_safety(3.0, 2.0)
+
+        self.assertEqual(result["status"], "UNSAFE")
+        self.assertIn("HIGH_WAVE_HEIGHT", result["hazards"])
+        self.assertIn("STRONG_OCEAN_CURRENT", result["hazards"])
+
+    def test_marine_safety_insufficient_evidence(self):
+        result = assess_marine_safety(None, 0.6)
+
+        self.assertEqual(
+            result["status"],
+            "INSUFFICIENT_EVIDENCE",
+        )
+
+    def test_ocean_agent_contains_safety_result(self):
+        request = AgentRequest(
+            query="Is it safe to fish near Kochi?",
+            location="Kochi",
+        )
+
+        response = handle_ocean(request)
+
+        safety = response.data["marine_safety"]
+
+        self.assertIn("status", safety)
+        self.assertIn("hazards", safety)
+        self.assertIn("reasons", safety)
+        self.assertEqual(safety["status"], "SAFE")
 
     def test_confidence_range(self):
         request = AgentRequest(

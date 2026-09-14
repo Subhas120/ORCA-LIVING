@@ -3,6 +3,7 @@ import os
 from datetime import datetime
 
 from agents.common.agent_contract import AgentRequest, AgentResponse
+from agents.ocean.safety import assess_marine_safety
 
 
 REQUIRED_FIELDS = [
@@ -114,6 +115,21 @@ def handle_ocean(request: AgentRequest) -> AgentResponse:
                 error="No valid marine observations available",
             )
 
+        wave_height = get_parameter_value(
+            marine_data,
+            "wave_height",
+        )
+
+        current_speed = get_parameter_value(
+            marine_data,
+            "ocean_current",
+        )
+
+        marine_safety = assess_marine_safety(
+            wave_height,
+            current_speed,
+        )
+
         data = {
             "sst": get_parameter_value(
                 marine_data,
@@ -123,18 +139,13 @@ def handle_ocean(request: AgentRequest) -> AgentResponse:
                 marine_data,
                 "chlorophyll",
             ),
-            "wave_height": get_parameter_value(
-                marine_data,
-                "wave_height",
-            ),
+            "wave_height": wave_height,
             "wave_period": get_parameter_value(
                 marine_data,
                 "wave_period",
             ),
-            "current_speed": get_parameter_value(
-                marine_data,
-                "ocean_current",
-            ),
+            "current_speed": current_speed,
+            "marine_safety": marine_safety,
             "pfz": pfz_data,
         }
 
