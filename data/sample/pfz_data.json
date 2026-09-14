@@ -1,0 +1,20 @@
+[
+  {
+    "pfz_id": "PFZ_KOCHI_01",
+    "latitude": 9.8500,
+    "longitude": 76.1500,
+    "distance_km": 15,
+    "status": "suitable",
+    "source": "Sample PFZ Advisory",
+    "confidence": 0.88
+  },
+  {
+    "pfz_id": "PFZ_KOCHI_02",
+    "latitude": 9.7800,
+    "longitude": 76.1200,
+    "distance_km": 8,
+    "status": "highly_suitable",
+    "source": "Sample PFZ Advisory",
+    "confidence": 0.91
+  }
+]
