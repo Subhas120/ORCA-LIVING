@@ -1,44 +1,27 @@
 /*
  * ORCA M3 DECISION SERVICE
  *
- * Integration flow:
+ * M3 communicates with the authoritative M4 integration API.
  *
- * M3 frontend
- *     ↓
- * M4 /api/v1/decision
- *     ↓
- * M1 + M2 decision pipeline
- *     ↓
- * M4 DecisionResponse
- *     ↓
- * M3 response adapter
- *
- * M3 only consumes and visualizes the supplied
- * decision information.
+ * M4
+ *  ↓
+ * /api/v1/decision
+ *  ↓
+ * M4 response
+ *  ↓
+ * m4Adapter
+ *  ↓
+ * M3 visualization
  */
 
-import {
-  requestDecision,
-} from "./api.js";
+import { requestDecision } from "./api.js";
 
 import {
-  adaptDecisionResponse,
-} from "./m2Adapter.js";
+  adaptM4Response,
+} from "./m4Adapter.js";
 
+export async function getDecision(request) {
+  const m4Response = await requestDecision(request);
 
-/*
- * Get the final ORCA decision from the
- * M4 decision integration endpoint.
- */
-export async function getDecision(
-  request
-) {
-  const backendResponse =
-    await requestDecision(
-      request
-    );
-
-  return adaptDecisionResponse(
-    backendResponse
-  );
+  return adaptM4Response(m4Response);
 }

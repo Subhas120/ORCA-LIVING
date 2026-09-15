@@ -1,0 +1,23 @@
+﻿[
+  {
+    "id": "PFZ-DEMO-001",
+    "latitude": 9.72,
+    "longitude": 76.25,
+    "confidence": 0.82,
+    "source": "ORCA prototype demo data"
+  },
+  {
+    "id": "PFZ-DEMO-002",
+    "latitude": 9.58,
+    "longitude": 76.32,
+    "confidence": 0.76,
+    "source": "ORCA prototype demo data"
+  },
+  {
+    "id": "PFZ-DEMO-003",
+    "latitude": 9.85,
+    "longitude": 76.38,
+    "confidence": 0.69,
+    "source": "ORCA prototype demo data"
+  }
+]

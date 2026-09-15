@@ -1,8 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { decisionState as demoDecisionState } from "./models/decisionState";
-import { candidates as demoCandidates } from "./data/mockDecision";
-
 import { getDecision } from "./services/decisionService";
 
 import MarineMap from "./components/map/MarineMap";
@@ -26,6 +23,16 @@ function App() {
   const [error, setError] =
     useState(null);
 
+  const decisionRequest = {
+    query: "Find a safe fishing location",
+    location: "Kochi",
+    date: "2026-09-15",
+    time: "morning",
+    activity: "fishing",
+    vessel_type: "Small vessel",
+  };
+
+
   const [selectedCandidateId, setSelectedCandidateId] =
     useState(null);
 
@@ -43,31 +50,7 @@ function App() {
       try {
         setLoading(true);
         setError(null);
-
-        const result =
-          await getDecision({
-            query:
-              demoDecisionState
-                .objective
-                .text,
-
-            location:
-              "Kochi",
-
-            date:
-              "2026-09-15",
-
-            time:
-              "morning",
-
-            activity:
-              "fishing",
-
-            vessel_type:
-              demoDecisionState
-                .objective
-                .vessel,
-          });
+        const result = await getDecision(decisionRequest);
 
         setDecision(
           result
@@ -100,31 +83,16 @@ function App() {
     decision !== null;
 
 
-  const currentDecision =
-    usingM4
-      ? decision
-      : demoDecisionState;
+  const currentDecision = decision;
 
 
-  const currentCandidates =
-    useMemo(
-      () => {
-        const source =
-          usingM4
-            ? decision?.candidates
-            : demoCandidates;
-
-        return Array.isArray(
-          source
-        )
-          ? source
-          : [];
-      },
-      [
-        decision,
-        usingM4,
-      ]
-    );
+  const currentCandidates = useMemo(
+    () =>
+      Array.isArray(decision?.candidates)
+        ? decision.candidates
+        : [],
+    [decision]
+  );
 
 
   const selectedCandidate =
@@ -136,22 +104,11 @@ function App() {
 
 
   const recommended =
-    usingM4
-      ? decision?.recommendedCandidate
-      : demoDecisionState
-          .recommendedCandidate;
+    decision?.recommendedCandidate ?? null;
 
 
   const uncertaintyScore =
-    usingM4
-      ? (
-          decision?.uncertainty?.score ??
-          null
-        )
-      : (
-          recommended?.uncertainty ??
-          null
-        );
+    decision?.uncertainty?.score ?? null;
 
 
   const decisionStatus =
@@ -165,26 +122,12 @@ function App() {
 
 
   const paretoPoints =
-    usingM4
-      ? (
-          currentDecision
-            ?.decisionIntelligence
-            ?.paretoPoints ??
-          []
-        )
-      : [];
+    currentDecision?.decisionIntelligence?.paretoPoints ??
+    [];
 
 
   const dataMode =
-    usingM4
-      ? (
-          currentDecision?.dataMode ??
-          "UNKNOWN"
-        )
-      : (
-          demoDecisionState.dataMode ??
-          "SIMULATED"
-        );
+    currentDecision?.dataMode ?? "UNKNOWN";
 
 
   function handleCandidateSelect(
@@ -247,7 +190,7 @@ function App() {
 
           {usingM4
             ? "M4 DECISION BACKEND CONNECTED"
-            : "SIMULATED DEMO"}
+            : "M4 DECISION BACKEND NOT AVAILABLE"}
 
         </div>
 
@@ -324,30 +267,6 @@ function App() {
           )}
 
 
-        {error &&
-          !loading && (
-
-            <section
-              className="integration-status demo"
-              role="status"
-            >
-
-              <strong>
-                SIMULATED FALLBACK
-              </strong>
-
-              <span>
-                The final M4 decision backend
-                could not be reached. The dashboard
-                is displaying clearly labelled
-                simulated demonstration data.
-              </span>
-
-            </section>
-
-          )}
-
-
         <section className="objective">
 
           <span>
@@ -355,22 +274,16 @@ function App() {
           </span>
 
           <h2>
-            {demoDecisionState
-              .objective
-              .text}
+            {decisionRequest.query}
           </h2>
 
           <p>
             Vessel:{" "}
-            {demoDecisionState
-              .objective
-              .vessel}
+            {decisionRequest.vessel_type}
 
             {" · "}
 
-            {demoDecisionState
-              .objective
-              .time}
+            {decisionRequest.time}
           </p>
 
         </section>
@@ -432,19 +345,10 @@ function App() {
                 aria-label="Decision confidence"
               >
 
-                {usingM4
-                  ? (
-                      currentDecision
-                        ?.confidence !== null &&
-                      currentDecision
-                        ?.confidence !== undefined
-                        ? `${currentDecision.confidence}%`
-                        : "NOT SUPPLIED"
-                    )
-                  : (
-                      recommended?.confidence ??
-                      "UNKNOWN"
-                    )}
+                {currentDecision?.confidence !== null &&
+                currentDecision?.confidence !== undefined
+                  ? `${currentDecision.confidence}%`
+                  : "NOT SUPPLIED"}
 
               </span>
 
@@ -466,23 +370,11 @@ function App() {
 
               <p>
 
-                {usingM4
-                  ? (
-                      currentDecision
-                        ?.recommendation
-                        ?.reason ??
-                      currentDecision
-                        ?.decisionSummary ??
-                      (
-                        hasRecommendation
-                          ? "Recommendation reason unavailable."
-                          : "The backend did not supply a recommendation."
-                      )
-                    )
-                  : (
-                      demoDecisionState
-                        .decisionSummary
-                    )}
+                {currentDecision?.recommendation?.reason ??
+                  currentDecision?.decisionSummary ??
+                  (hasRecommendation
+                    ? "Recommendation reason unavailable."
+                    : "The backend did not supply a recommendation.")}
 
               </p>
 
@@ -538,19 +430,8 @@ function App() {
 
                 <strong>
 
-                  {usingM4
-                    ? (
-                        currentDecision
-                          ?.marineSafety
-                          ?.status ??
-                        "NOT SUPPLIED"
-                      )
-                    : (
-                        recommended
-                          ?.safety !== undefined
-                          ? `${recommended.safety}%`
-                          : "NOT SUPPLIED"
-                      )}
+                  {currentDecision?.marineSafety?.status ??
+                    "NOT SUPPLIED"}
 
                 </strong>
 
@@ -565,21 +446,10 @@ function App() {
 
                 <strong>
 
-                  {usingM4
-                    ? (
-                        recommended
-                          ?.opportunity !== null &&
-                        recommended
-                          ?.opportunity !== undefined
-                          ? `${recommended.opportunity}%`
-                          : "NOT SUPPLIED"
-                      )
-                    : (
-                        recommended
-                          ?.opportunity !== undefined
-                          ? `${recommended.opportunity}%`
-                          : "NOT SUPPLIED"
-                      )}
+                  {recommended?.opportunity !== null &&
+                  recommended?.opportunity !== undefined
+                    ? `${recommended.opportunity}%`
+                    : "NOT SUPPLIED"}
 
                 </strong>
 
@@ -631,45 +501,16 @@ function App() {
               <h3>
                 WHY?
               </h3>
-
-
-              {usingM4 ? (
-
-                currentDecision
-                  ?.decisionSummary ? (
-
-                  <p>
-                    {"✓"}{" "}
-                    {currentDecision
-                      .decisionSummary}
-                  </p>
-
-                ) : (
-
-                  <p>
-                    {hasRecommendation
-                      ? "No decision explanation was supplied by the backend."
-                      : "No recommendation was supplied by the backend."}
-                  </p>
-
-                )
-
+              {currentDecision?.decisionSummary ? (
+                <p>
+                  {"✓"}{" "}{currentDecision.decisionSummary}
+                </p>
               ) : (
-
-                demoDecisionState
-                  .tradeoffs
-                  .map(
-                    (tradeoff) => (
-
-                      <p
-                        key={tradeoff}
-                      >
-                        {"✓"} {tradeoff}
-                      </p>
-
-                    )
-                  )
-
+                <p>
+                  {hasRecommendation
+                    ? "No decision explanation was supplied by the backend."
+                    : "No recommendation was supplied by the backend."}
+                </p>
               )}
 
             </div>
@@ -682,11 +523,7 @@ function App() {
         <MarineConditions
 
           conditions={
-            usingM4
-              ? currentDecision
-                  ?.marineConditions
-              : demoDecisionState
-                  .marineConditions
+            currentDecision?.marineConditions ?? null
           }
 
           safety={
@@ -944,13 +781,7 @@ function App() {
             recommended
           }
 
-          evidence={
-            usingM4
-              ? currentDecision
-                  ?.evidence
-              : demoDecisionState
-                  .evidence
-          }
+          evidence={currentDecision?.evidence ?? []}
 
           dataMode={
             dataMode
@@ -961,16 +792,7 @@ function App() {
 
         <UncertaintyPanel
 
-          uncertainty={
-            usingM4
-              ? (
-                  currentDecision
-                    ?.uncertainty ??
-                  {}
-                )
-              : currentDecision
-                  ?.uncertainty
-          }
+          uncertainty={currentDecision?.uncertainty ?? {}}
 
         />
 

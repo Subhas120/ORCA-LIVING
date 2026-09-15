@@ -1,0 +1,46 @@
+﻿{
+  "type": "FeatureCollection",
+  "name": "ORCA Prototype Safety Zones",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Prototype Restricted Zone",
+        "zone_type": "restricted",
+        "source": "ORCA prototype demo data"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [76.20, 9.80],
+            [76.30, 9.80],
+            [76.30, 9.88],
+            [76.20, 9.88],
+            [76.20, 9.80]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Prototype Protected Zone",
+        "zone_type": "protected",
+        "source": "ORCA prototype demo data"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [76.40, 9.50],
+            [76.48, 9.50],
+            [76.48, 9.57],
+            [76.40, 9.57],
+            [76.40, 9.50]
+          ]
+        ]
+      }
+    }
+  ]
+}

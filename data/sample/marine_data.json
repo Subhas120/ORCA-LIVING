@@ -1,0 +1,52 @@
+[
+  {
+    "parameter": "sea_surface_temperature",
+    "value": 28.4,
+    "unit": "celsius",
+    "latitude": 9.9312,
+    "longitude": 76.2673,
+    "timestamp": "2026-09-10T10:00:00",
+    "source": "Sample Marine Dataset",
+    "confidence": 0.92
+  },
+  {
+    "parameter": "chlorophyll",
+    "value": 1.7,
+    "unit": "mg/m3",
+    "latitude": 9.9312,
+    "longitude": 76.2673,
+    "timestamp": "2026-09-10T10:00:00",
+    "source": "Sample Marine Dataset",
+    "confidence": 0.88
+  },
+  {
+    "parameter": "wave_height",
+    "value": 1.2,
+    "unit": "meters",
+    "latitude": 9.9312,
+    "longitude": 76.2673,
+    "timestamp": "2026-09-10T10:00:00",
+    "source": "Sample Marine Dataset",
+    "confidence": 0.95
+  },
+  {
+    "parameter": "wave_period",
+    "value": 7,
+    "unit": "seconds",
+    "latitude": 9.9312,
+    "longitude": 76.2673,
+    "timestamp": "2026-09-10T10:00:00",
+    "source": "Sample Marine Dataset",
+    "confidence": 0.90
+  },
+  {
+    "parameter": "ocean_current",
+    "value": 0.6,
+    "unit": "m/s",
+    "latitude": 9.9312,
+    "longitude": 76.2673,
+    "timestamp": "2026-09-10T10:00:00",
+    "source": "Sample Marine Dataset",
+    "confidence": 0.85
+  }
+]
