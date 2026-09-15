@@ -192,11 +192,185 @@ function AnalysisSection({
   );
 }
 
+function DecisionTraceSection({
+  decisionTrace,
+}) {
+  const available =
+    decisionTrace !== null &&
+    decisionTrace !== undefined;
+
+  return (
+    <details
+      className="decision-trace"
+      style={{
+        border: "1px solid #223b4d",
+        borderRadius: "9px",
+        background: "#0f1e2b",
+        overflow: "hidden",
+      }}
+    >
+      <summary
+        style={{
+          cursor: "pointer",
+          padding: "14px 16px",
+          fontSize: "12px",
+          fontWeight: "700",
+          letterSpacing: "0.08em",
+          color: "#dce7ed",
+          listStylePosition: "inside",
+        }}
+      >
+        DECISION TRACE
+        <span
+          style={{
+            float: "right",
+            padding: "4px 8px",
+            borderRadius: "5px",
+            fontSize: "9px",
+            fontWeight: "700",
+            letterSpacing: "0.06em",
+            color: available
+              ? "#78d6a5"
+              : "#e4bd57",
+            background: available
+              ? "#10291f"
+              : "#252014",
+            border: available
+              ? "1px solid #28553f"
+              : "1px solid #5a4a20",
+          }}
+        >
+          {available
+            ? "AVAILABLE"
+            : "NOT SUPPLIED"}
+        </span>
+      </summary>
+
+      {available ? (
+        <div
+          style={{
+            padding: "14px",
+            borderTop: "1px solid #223b4d",
+          }}
+        >
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fit, minmax(180px, 1fr))",
+              gap: "10px",
+            }}
+          >
+            {typeof decisionTrace === "object" ? (
+              Object.entries(decisionTrace).map(
+                ([key, value]) => (
+                  <div
+                    className="analysis-item"
+                    key={key}
+                    style={{
+                      padding: "13px",
+                      borderRadius: "7px",
+                      background: "#0b1722",
+                      border: "1px solid #1d3444",
+                      minWidth: 0,
+                    }}
+                  >
+                    <span
+                      style={{
+                        display: "block",
+                        marginBottom: "6px",
+                        fontSize: "9px",
+                        fontWeight: "600",
+                        letterSpacing: "0.08em",
+                        color: "#718797",
+                      }}
+                    >
+                      {key
+                        .replace(
+                          /_/g,
+                          " "
+                        )
+                        .toUpperCase()}
+                    </span>
+
+                    <strong
+                      style={{
+                        display: "block",
+                        fontSize: "13px",
+                        lineHeight: "1.45",
+                        color: "#dce7ed",
+                        overflowWrap: "anywhere",
+                      }}
+                    >
+                      {formatValue(value)}
+                    </strong>
+                  </div>
+                )
+              )
+            ) : (
+              <div
+                className="analysis-item"
+                style={{
+                  padding: "13px",
+                  borderRadius: "7px",
+                  background: "#0b1722",
+                  border: "1px solid #1d3444",
+                }}
+              >
+                <strong
+                  style={{
+                    fontSize: "13px",
+                    color: "#dce7ed",
+                  }}
+                >
+                  {formatValue(decisionTrace)}
+                </strong>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div
+          style={{
+            padding: "16px",
+            borderTop: "1px solid #223b4d",
+            background: "#101b24",
+          }}
+        >
+          <strong
+            style={{
+              display: "block",
+              marginBottom: "7px",
+              fontSize: "13px",
+              color: "#e4bd57",
+            }}
+          >
+            Result not supplied by backend
+          </strong>
+
+          <span
+            style={{
+              fontSize: "12px",
+              lineHeight: "1.5",
+              color: "#91a5b3",
+            }}
+          >
+            No authoritative decision trace was provided
+            by the decision service. M3 does not calculate
+            or reconstruct the decision trace locally.
+          </span>
+        </div>
+      )}
+    </details>
+  );
+}
+
 function DecisionAnalysisPanel({
   sensitivity = null,
   counterfactual = null,
   robustness = null,
   informationGaps = [],
+  decisionTrace = null,
 }) {
   const hasInformationGaps =
     Array.isArray(informationGaps) &&
@@ -252,9 +426,9 @@ function DecisionAnalysisPanel({
           }}
         >
           These views display sensitivity,
-          counterfactual and robustness information
-          supplied by the decision service. M3 does
-          not calculate new decision results.
+          counterfactual, robustness and decision trace
+          information supplied by the decision service.
+          M3 does not calculate new decision results.
         </p>
       </div>
 
@@ -279,6 +453,10 @@ function DecisionAnalysisPanel({
         <AnalysisSection
           title="ROBUSTNESS"
           data={robustness}
+        />
+
+        <DecisionTraceSection
+          decisionTrace={decisionTrace}
         />
       </div>
 
@@ -383,8 +561,8 @@ function DecisionAnalysisPanel({
           This interface displays authoritative
           backend decision intelligence. It does not
           perform local safety, optimization,
-          dominance, sensitivity, counterfactual or
-          robustness calculations.
+          dominance, sensitivity, counterfactual,
+          robustness or decision trace calculations.
         </span>
       </div>
     </section>
