@@ -6,6 +6,11 @@
  *
  * M4 owns the decision.
  * M3 only visualizes it.
+ *
+ * Important:
+ * M3 does not derive decision confidence, uncertainty,
+ * safety, ranking, optimization, Pareto results, or
+ * scientific suitability from other fields.
  */
 
 export function adaptM4Response(response) {
@@ -34,42 +39,20 @@ export function adaptM4Response(response) {
   };
 
   return {
-    /*
-     * ---------------------------------------------------------
-     * Authoritative M4 decision status
-     * ---------------------------------------------------------
-     */
     status: response.status,
-
-    /*
-     * ---------------------------------------------------------
-     * User objective
-     *
-     * Prefer the actual M4 response.
-     * ---------------------------------------------------------
-     */
     objective: response.objective ?? null,
 
     /*
-     * ---------------------------------------------------------
-     * Decision confidence
+     * Decision-level confidence is displayed only when M4
+     * explicitly supplies a top-level confidence field.
      *
-     * This is M1's confidence when available.
-     * Do not derive decision confidence from safety.
-     * ---------------------------------------------------------
+     * Do NOT derive it from recommendedCandidate.confidence.
      */
     confidence:
       response.confidence != null
         ? parsePercentage(response.confidence)
-        : recommended?.confidence != null
-          ? parsePercentage(recommended.confidence)
-          : null,
+        : null,
 
-    /*
-     * ---------------------------------------------------------
-     * Recommendation
-     * ---------------------------------------------------------
-     */
     recommendation: recommended
       ? {
         id: recommended.id,
@@ -81,40 +64,18 @@ export function adaptM4Response(response) {
       }
       : null,
 
-    /*
-     * ---------------------------------------------------------
-     * Recommended candidate
-     * ---------------------------------------------------------
-     */
     recommendedCandidate: recommended
       ? {
         id: recommended.id,
         name: recommended.name,
         status: recommended.status,
-
-        /*
-         * Safety is intentionally not reconstructed here.
-         * Authoritative marine safety comes from M4.
-         */
         safety: recommended.safety ?? null,
-
-        opportunity:
-          recommended.opportunity ?? null,
-
-        uncertainty:
-          recommended.uncertainty ?? null,
-
-        distance:
-          recommended.distance ?? null,
-
-        confidence:
-          parsePercentage(
-            recommended.confidence,
-          ),
-
+        opportunity: recommended.opportunity ?? null,
+        uncertainty: recommended.uncertainty ?? null,
+        distance: recommended.distance ?? null,
+        confidence: parsePercentage(recommended.confidence),
         lat: recommended.lat,
         lng: recommended.lng,
-
         reason:
           recommended.reason ??
           response.decisionSummary ??
@@ -122,163 +83,58 @@ export function adaptM4Response(response) {
       }
       : null,
 
-    /*
-     * ---------------------------------------------------------
-     * All candidates
-     *
-     * Candidate status comes directly from M4.
-     * M3 does not reclassify candidates.
-     * ---------------------------------------------------------
-     */
     candidates: candidates.map((candidate) => ({
       id: candidate.id,
       name: candidate.name,
       status: candidate.status,
-
       safety: candidate.safety ?? null,
-
-      opportunity:
-        candidate.opportunity ?? null,
-
-      uncertainty:
-        candidate.uncertainty ?? null,
-
-      distance:
-        candidate.distance ?? null,
-
-      confidence:
-        parsePercentage(
-          candidate.confidence,
-        ),
-
+      opportunity: candidate.opportunity ?? null,
+      uncertainty: candidate.uncertainty ?? null,
+      distance: candidate.distance ?? null,
+      confidence: parsePercentage(candidate.confidence),
       lat: candidate.lat,
       lng: candidate.lng,
-
-      reason:
-        candidate.reason ?? null,
-
+      reason: candidate.reason ?? null,
       opportunityStatus: null,
     })),
 
     /*
-     * ---------------------------------------------------------
-     * AUTHORITATIVE MARINE SAFETY
-     *
-     * This MUST come directly from M4.
-     *
-     * Do NOT derive safety from:
-     *   candidate.status
-     *   candidate.safety
-     *   opportunity
-     *   confidence
-     * ---------------------------------------------------------
+     * Safety is authoritative only when supplied by M4.
+     * UNKNOWN means M4 did not provide a marine safety status.
      */
     marineSafety: {
-      status:
-        response.marineSafetyStatus ??
-        "UNKNOWN",
-
-      reasons:
-        response.marineSafetyReasons ?? [],
+      status: response.marineSafetyStatus ?? "UNKNOWN",
+      reasons: response.marineSafetyReasons ?? [],
     },
 
-    /*
-     * ---------------------------------------------------------
-     * Marine conditions
-     *
-     * M4 currently does not expose a conditions object.
-     * ---------------------------------------------------------
-     */
-    marineConditions:
-      response.marineConditions ?? null,
+    marineConditions: response.marineConditions ?? null,
 
     /*
-     * ---------------------------------------------------------
-     * Uncertainty
-     *
-     * Preserve the actual M4 object.
-     * Never fabricate an uncertainty value.
-     * ---------------------------------------------------------
+     * Never derive uncertainty from candidate confidence.
      */
-    uncertainty:
-      response.uncertainty ?? null,
+    uncertainty: response.uncertainty ?? null,
+
+    evidence: response.evidence ?? [],
+    tradeoffs: response.tradeoffs ?? [],
+    sensitivity: response.sensitivity ?? null,
 
     /*
-     * ---------------------------------------------------------
-     * Evidence
-     * ---------------------------------------------------------
+     * These fields are passed through only if M4 supplies them.
+     * M3 does not calculate them locally.
      */
-    evidence:
-      response.evidence ?? [],
+    paretoCandidateIds: response.paretoCandidateIds ?? [],
+    robustness: response.robustness ?? null,
+    valueOfInformation: response.valueOfInformation ?? null,
+    counterfactuals: response.counterfactuals ?? [],
+    explanation: response.explanation ?? null,
+    decisionTrace: response.decisionTrace ?? null,
 
-    /*
-     * ---------------------------------------------------------
-     * Tradeoffs
-     * ---------------------------------------------------------
-     */
-    tradeoffs:
-      response.tradeoffs ?? [],
-
-    /*
-     * ---------------------------------------------------------
-     * Sensitivity
-     * ---------------------------------------------------------
-     */
-    sensitivity:
-      response.sensitivity ?? null,
-
-    /*
-     * ---------------------------------------------------------
-     * M1 Decision Intelligence
-     *
-     * Preserve the fields supplied by M4.
-     * M3 does not calculate them.
-     * ---------------------------------------------------------
-     */
-    paretoCandidateIds:
-      response.paretoCandidateIds ?? [],
-
-    robustness:
-      response.robustness ?? null,
-
-    valueOfInformation:
-      response.valueOfInformation ?? null,
-
-    counterfactuals:
-      response.counterfactuals ?? [],
-
-    explanation:
-      response.explanation ?? null,
-
-    decisionTrace:
-      response.decisionTrace ?? null,
-
-    /*
-     * ---------------------------------------------------------
-     * Decision summary
-     * ---------------------------------------------------------
-     */
     decisionSummary:
       response.decisionSummary ??
       "No decision summary available.",
 
-    /*
-     * ---------------------------------------------------------
-     * Explicit rejected candidates
-     *
-     * These are M4/M1 classifications.
-     * Never convert them into alternatives.
-     * ---------------------------------------------------------
-     */
-    rejectedCandidates:
-      rejected,
+    rejectedCandidates: rejected,
 
-    /*
-     * ---------------------------------------------------------
-     * Data mode
-     * ---------------------------------------------------------
-     */
-    dataMode:
-      response.dataMode ?? "DEMO",
+    dataMode: response.dataMode ?? "UNKNOWN",
   };
 }

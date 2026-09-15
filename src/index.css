@@ -319,10 +319,42 @@ input {
 }
 
 .candidate-card {
+  display: block;
+  width: 100%;
   padding: 18px;
+
   border: 1px solid #223b4d;
   border-radius: 9px;
+
   background: #0f1e2b;
+  color: #e8f1f7;
+
+  font: inherit;
+  text-align: left;
+
+  cursor: pointer;
+
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    transform 0.15s ease;
+}
+
+.candidate-card:hover {
+  border-color: #3a586d;
+  background: #122331;
+  transform: translateY(-1px);
+}
+
+.candidate-card:focus-visible {
+  outline: 2px solid #63dba4;
+  outline-offset: 2px;
+}
+
+.candidate-card.selected {
+  border-color: #63dba4;
+  background: #122a2a;
+  box-shadow: 0 0 0 1px rgba(99, 219, 164, 0.25);
 }
 
 .candidate-card.recommended {
@@ -336,6 +368,11 @@ input {
 .candidate-card.rejected {
   border-color: #67373a;
   background: #151519;
+}
+
+.candidate-card.rejected.selected {
+  border-color: #e56b6f;
+  box-shadow: 0 0 0 1px rgba(229, 107, 111, 0.25);
 }
 
 .candidate-header {
@@ -690,6 +727,7 @@ input {
     height: 400px;
   }
 }
+
 /* =========================
    UNCERTAINTY PANEL
 ========================= */
@@ -814,6 +852,7 @@ input {
 
   line-height: 1.5;
 }
+
 /* ================================
    MARINE CONDITIONS - UNAVAILABLE
 ================================ */
@@ -845,4 +884,250 @@ input {
   font-size: 11px;
   color: #7f909f;
   letter-spacing: 0.08em;
+}
+/* =========================
+   DECISION REQUEST FORM
+========================= */
+
+.request-panel {
+  margin-bottom: 24px;
+  border: 1px solid #1b3447;
+  border-radius: 12px;
+  background: #0c1925;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+}
+
+.request-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  padding: 22px 24px 24px;
+}
+
+.request-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.request-field-wide {
+  grid-column: 1 / -1;
+}
+
+.request-field label {
+  color: #9ab0bf;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+.request-field input,
+.request-field select {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid #294457;
+  border-radius: 7px;
+  background: #101f2d;
+  color: #e8f1f7;
+  font: inherit;
+  outline: none;
+}
+
+.request-field input::placeholder {
+  color: #627989;
+}
+
+.request-field input:focus-visible,
+.request-field select:focus-visible {
+  border-color: #63dba4;
+  outline: 2px solid #63dba4;
+  outline-offset: 1px;
+}
+
+.request-field small {
+  color: #71899c;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.request-actions {
+  display: flex;
+  align-items: flex-end;
+}
+
+.request-submit,
+.retry-button {
+  min-height: 42px;
+  padding: 10px 18px;
+  border: 1px solid #2d7559;
+  border-radius: 7px;
+  background: #12382d;
+  color: #63dba4;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  cursor: pointer;
+}
+
+.request-submit:hover,
+.retry-button:hover {
+  background: #174536;
+}
+
+.request-submit:focus-visible,
+.retry-button:focus-visible {
+  outline: 2px solid #63dba4;
+  outline-offset: 2px;
+}
+
+.request-submit:disabled,
+.retry-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* =========================
+   SEMANTIC DECISION STATES
+========================= */
+
+.decision-state {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 24px;
+  padding: 16px 18px;
+  border: 1px solid #294457;
+  border-radius: 10px;
+  background: #0c1925;
+}
+
+.decision-state > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.decision-state strong {
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+
+.decision-state span {
+  color: #9aadb9;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.decision-state-code {
+  flex-shrink: 0;
+  padding: 6px 9px;
+  border-radius: 6px;
+  background: #101f2d;
+  color: #9aadb9;
+  font-size: 9px !important;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+}
+
+.decision-state.available {
+  border-color: #2d7559;
+}
+
+.decision-state.available strong {
+  color: #63dba4;
+}
+
+.decision-state.unsafe {
+  border-color: #67373a;
+  background: #151519;
+}
+
+.decision-state.unsafe strong {
+  color: #e56b6f;
+}
+
+.decision-state.insufficient {
+  border-color: #685a2c;
+  background: #17170f;
+}
+
+.decision-state.insufficient strong {
+  color: #d8bf62;
+}
+
+.decision-state.unavailable,
+.decision-state.unknown {
+  border-color: #5a4b28;
+}
+
+.decision-state.unavailable strong,
+.decision-state.unknown strong {
+  color: #d8bf62;
+}
+
+/* =========================
+   RETRY / ERROR
+========================= */
+
+.integration-status.error {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.integration-status.error span {
+  flex: 1 1 250px;
+}
+
+.retry-button {
+  flex-shrink: 0;
+}
+
+/* =========================
+   REQUEST FORM RESPONSIVE
+========================= */
+
+@media (max-width: 900px) {
+  .request-form {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .request-field-wide {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 600px) {
+  .request-form {
+    grid-template-columns: 1fr;
+    padding: 18px;
+  }
+
+  .request-field-wide {
+    grid-column: auto;
+  }
+
+  .request-actions {
+    align-items: stretch;
+  }
+
+  .request-submit {
+    width: 100%;
+  }
+
+  .decision-state {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .decision-state-code {
+    white-space: normal;
+  }
 }
